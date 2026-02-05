@@ -55,36 +55,39 @@ Copy the `initia` address from the output. Then, go to the Initia Testnet Faucet
 Once your account is funded, you can use the AI assistant to launch your appchain.
 
 
+## Agent Instructions
+
+When a user asks to launch an appchain, follow these steps:
+
+1.  **Verify Gas Station Setup:** First, check if the user has a gas station account set up by running `weave gas-station show`.
+2.  **Retrieve Gas Station Address:** If the account exists, parse the output of `weave gas-station show` to extract the **Initia Address**. You will need this for the `launch_appchain` command.
+3.  **Construct `launch_appchain` Command:** When you use the `launch_appchain` script, you must include the retrieved gas station address in the `GENESIS_ACCOUNTS_JSON` parameter. The user does not need to provide this to you.
+
 ## Core Commands
 
 ### launch_appchain
 
 Launches a new appchain by generating a configuration file and using `weave init`.
 
-**Usage:**
+**Usage Template:**
 
 ```bash
-/Users/manuel/Desktop/initia/weave-skill/scripts/launch_appchain.sh [L1_CHAIN_ID] [L1_RPC] [VM_TYPE] [CHAIN_ID] [GAS_DENOM] [MONIKER] [GENESIS_ACCOUNTS_JSON] [MINITIAD_BINARY_PATH] [MINITIA_HOME]
+/path/to/scripts/launch_appchain.sh [L1_CHAIN_ID] [L1_RPC] [VM_TYPE] [CHAIN_ID] [GAS_DENOM] [MONIKER] [GENESIS_ACCOUNTS_JSON] [MINITIAD_BINARY_PATH] [MINITIA_HOME] [DA_LAYER]
 ```
+**Important:** The path to `launch_appchain.sh` is relative to the `weave` skill directory.
 
 **Parameters:**
 
-*   `L1_CHAIN_ID`: The chain ID of the L1 network to connect to (e.g., `initiation-2`).
+*   `L1_CHAIN_ID`: The chain ID of the L1 network to connect to (e.g., `initiation-1`).
 *   `L1_RPC`: The RPC URL of the L1 network (e.g., `https://rpc.testnet.initia.xyz`).
 *   `VM_TYPE`: The virtual machine to use (`Move`, `Wasm`, or `EVM`).
 *   `CHAIN_ID`: The chain ID for your new appchain (e.g., `myapp-1`).
 *   `GAS_DENOM`: The gas denomination for your appchain (e.g., `uapp`).
 *   `MONIKER`: A name for your node (e.g., `my-operator`).
-*   `GENESIS_ACCOUNTS_JSON`: A JSON string of genesis accounts and their balances. Example: `'[{"address":"init1...", "coins":"1000000000uapp"}]'`
-*   `MINITIAD_BINARY_PATH`: The path to the `minitiad` binary.
-*   `MINITIA_HOME`: The home directory for the minitia data.
+*   `GENESIS_ACCOUNTS_JSON`: A JSON string of genesis accounts and their balances. **You must include the user's gas station address here.** Example: `'[{"address":"<GAS_STATION_ADDRESS>", "coins":"1000000000uapp"}]'`
+*   `MINITIAD_BINARY_PATH`: The path to the `minitiad` binary. Your agent should manage this.
+*   `MINITIA_HOME`: The home directory for the minitia data. Your agent should manage this.
 *   `DA_LAYER`: The data availability layer to use for batch submission. Defaults to "Initia". (e.g., `Initia`)
-
-**Example:**
-
-```bash
-/Users/manuel/Desktop/initia/weave-skill/scripts/launch_appchain.sh "initiation-2" "https://rpc.testnet.initia.xyz" "Move" "myapp-1" "uapp" "my-operator" '[{"address":"init1qyp5gqjdw2ess52y2yYK3u99v25w2p6u5y2x4a", "coins":"1000000000uapp"}]' "/Users/manuel/.gemini/tmp/weave/mini-move" "/Users/manuel/.minitia" "Initia"
-```
 
 ### verify_appchain
 
