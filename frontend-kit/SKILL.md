@@ -113,3 +113,82 @@ const Send = () => {
   // ... form handling ...
 };
 ```
+
+### Interacting with Smart Contracts (via `initia.js`)
+
+While the `useInterwovenKit` provides high-level transaction submission, understanding how to interact with deployed smart contracts involves using the `@initia/initia-js` SDK directly, often in conjunction with the `requestTxBlock` function.
+
+First, you'll instantiate the `LCDClient` to query your appchain.
+
+```tsx
+import { LCDClient } from '@initia/initia-js';
+
+const CHAIN_ID = 'your-appchain-id'; // Your appchain's ID
+const LCD_URL = 'http://localhost:1317'; // Default local LCD endpoint
+
+const lcd = new LCDClient({
+  URL: LCD_URL,
+  chainID: CHAIN_ID,
+});
+
+// Example Query: Read data from a Move smart contract
+// Replace MODULE_ADDRESS, module_name, function_name, and args
+const querySmartContract = async (walletAddress) => {
+  try {
+    const result = await lcd.move.viewFunction(
+      '0x1', // MODULE_ADDRESS (e.g., for blockforge::items)
+      'items', // module_name
+      'view_inventory', // function_name
+      { addr: walletAddress } // args for the view function
+    );
+    console.log('Query Result:', result);
+    return result;
+  } catch (error) {
+    console.error('Error querying smart contract:', error);
+    return null;
+  }
+};
+```
+
+To execute functions on your smart contract, you construct a `MsgExecute` message and pass it to `requestTxBlock` (or `submitTxBlock`).
+
+```tsx
+import { MsgExecute } from '@initia/initia-js';
+import { useInterwovenKit } from "@initia/interwovenkit-react";
+
+const ExecuteContractFunction = () => {
+  const { initiaAddress, requestTxBlock } = useInterwovenKit();
+  const MODULE_ADDRESS = '0x1'; // Address of your deployed contract
+
+  const handleMintShard = async () => {
+    if (!initiaAddress) {
+      alert('Wallet not connected.');
+      return;
+    }
+    const messages = [
+      new MsgExecute(
+        initiaAddress, // sender
+        MODULE_ADDRESS, // contract_address
+        'items', // module_name
+        'mint_shard', // function_name
+        [], // type_args
+        [1] // args (e.g., amount of shards to mint)
+      ),
+    ];
+
+    try {
+      const { transactionHash } = await requestTxBlock({ messages });
+      console.log('Mint Shard Transaction Hash:', transactionHash);
+      // Further actions like refreshing UI or waiting for confirmation
+    } catch (error) {
+      console.error('Error minting shard:', error);
+    }
+  };
+
+  return (
+    <button onClick={handleMintShard} disabled={!initiaAddress}>
+      Mint Shard
+    </button>
+  );
+};
+```
