@@ -51,7 +51,8 @@ When solving an Initia task:
 - Integration and transaction execution layer
 - Testing/CI and infra layer (RPC/LCD/indexer health)
 2. Resolve runtime context first:
-- If VM/`chain_id`/endpoint values are missing, run `runtime-discovery.md`.
+- If VM/`chain_id`/endpoint values are unknown, run `scripts/verify-appchain.sh --gas-station`.
+- If critical values are still missing, run `runtime-discovery.md`.
 - Confirm with user whether discovered local rollup should be used.
 3. Pick task-specific references from the Progressive Disclosure list below.
 4. Implement with Initia-specific correctness:
@@ -61,9 +62,9 @@ When solving an Initia task:
 - Ensure tx message `typeUrl` and payload shape match chain/VM expectations.
 - Keep address formats correct (`init1...`, `0x...`, `celestia1...`) per config field requirements.
 5. Validate before handoff:
-- Run layer-specific checks (for example `scripts/verify-appchain.sh`, `scripts/check-provider-setup.sh`, contract build/test commands).
+- Run layer-specific checks (for example `scripts/verify-appchain.sh --gas-station` to check health and gas station balance).
+- Verify L2 balances for system accounts if the rollup is active.
 - Mark interactive commands clearly when the user must run them.
-- If confidence is low on Initia behavior, verify against official docs first.
 
 ## Progressive Disclosure (Read When Needed)
 
