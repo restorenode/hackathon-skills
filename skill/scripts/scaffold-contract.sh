@@ -19,27 +19,47 @@ fi
 
 vm="$1"
 target="$2"
+pkg_name=$(basename "$target")
 
 mkdir -p "$target"
 
 case "$vm" in
   move)
     mkdir -p "$target/sources"
-    cat > "$target/Move.toml" <<'TOML'
+    mkdir -p "$target/deps"
+    
+    echo "Cloning movevm locally for fast builds (depth 1)..."
+    git clone --depth 1 https://github.com/initia-labs/movevm.git "$target/deps/movevm" > /dev/null 2>&1 || echo "Warning: git clone failed, check connectivity."
+
+    cat > "$target/Move.toml" <<TOML
 [package]
-name = "example"
+name = "$pkg_name"
 version = "0.0.1"
 
-[addresses]
-example = "0x1"
-
 [dependencies]
-InitiaStdlib = { git = "https://github.com/initia-labs/movevm.git", subdir = "precompile/modules/initia_stdlib", rev = "dc215a4b7e8f4d113acee042b5e854b0efe21f5e" }
+InitiaStdlib = { local = "deps/movevm/precompile/modules/initia_stdlib" }
+MoveStdlib = { local = "deps/movevm/precompile/modules/move_stdlib" }
+
+[addresses]
+$pkg_name = "_"
+std = "0x1"
 TOML
-    cat > "$target/sources/example.move" <<'MOVE'
-module example::example {
-    public fun hello(): u64 {
-        1
+
+    cat > "$target/sources/${pkg_name}.move" <<MOVE
+module ${pkg_name}::${pkg_name} {
+    use std::signer;
+
+    struct State has key {
+        value: u64,
+    }
+
+    public entry fun initialize(account: &signer) {
+        move_to(account, State { value: 0 });
+    }
+
+    #[view]
+    public fun get_value(addr: address): u64 acquires State {
+        borrow_global<State>(addr).value
     }
 }
 MOVE

@@ -54,7 +54,10 @@ When solving an Initia task:
 - If VM/`chain_id`/endpoint values are unknown, run `scripts/verify-appchain.sh --gas-station`.
 - If critical values are still missing, run `runtime-discovery.md`.
 - Confirm with user whether discovered local rollup should be used.
-3. Pick task-specific references from the Progressive Disclosure list below.
+3. For new contract projects, ALWAYS use scaffolding first:
+- `scripts/scaffold-contract.sh <move|wasm|evm> <target-dir>`
+- This ensures correct dependency paths (especially for Move) and compile-ready boilerplate.
+4. Pick task-specific references from the Progressive Disclosure list below.
 4. Implement with Initia-specific correctness:
 - Be explicit about network (`testnet`/`mainnet`), VM, `chain_id`, and endpoints (RPC/REST/JSON-RPC).
 - Keep denom and fee values aligned (`l1_config.gas_prices`, `l2_config.denom`, funded genesis balances).

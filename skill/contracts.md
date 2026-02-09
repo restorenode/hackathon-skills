@@ -64,11 +64,11 @@ cargo --version
 
 ### MoveVM / Appchain CLI
 
-Use the CLI for your Initia environment and confirm it supports Move build/publish for your target chain.
+Use the CLI for your Initia environment and confirm it supports Move build/publish for your target chain. For Move 2 support, use `initiad` (v1.2.2+).
 
 ```bash
-minitiad version
-minitiad config view
+initiad version
+initiad config view
 ```
 
 ## Implementation Checklist
@@ -81,61 +81,77 @@ minitiad config view
 
 ## MoveVM
 
-### Project Structure and Filenames
+### Quick Start (Fast-Path)
+
+Use the provided script to scaffold a project with pre-cloned local dependencies. This avoids slow git resolution and provides a Move 2.1 compatible starter.
+
+```bash
+# Usage: scripts/scaffold-contract.sh move <target-dir>
+scripts/scaffold-contract.sh move ./my-project
+```
+
+### Project Structure
 
 ```text
 .
 ├── Move.toml
+├── deps/
+│   └── movevm/ (Pre-cloned for speed)
 └── sources/
     └── <module_name>.move
 ```
 
-Conventions:
-- Module filename: `sources/<module_name>.move`
-- Module and function naming: `snake_case`
-
-### Baseline Dependency
+### Baseline Move.toml (Move 2.1)
 
 ```toml
+[package]
+name = "MyProject"
+version = "0.0.1"
+
 [dependencies]
-InitiaStdlib = { git = "https://github.com/initia-labs/movevm.git", subdir = "precompile/modules/initia_stdlib", rev = "dc215a4b7e8f4d113acee042b5e854b0efe21f5e" }
+InitiaStdlib = { local = "deps/movevm/precompile/modules/initia_stdlib" }
+MoveStdlib = { local = "deps/movevm/precompile/modules/move_stdlib" }
+
+[addresses]
+my_module = "_"
+std = "0x1"
 ```
 
-### Oracle Example
+### Move 2.1 Features Example
 
 ```move
-module example::oracle_example {
-    use std::string;
-    use std::string::String;
-    use initia_std::oracle::get_price;
+module my_module::game {
+    use std::signer;
 
-    #[view]
-    public fun get_price_example(pair_id: String): (u256, u64, u64) {
-        let (price, timestamp, decimals) = get_price(pair_id);
-        (price, timestamp, decimals)
+    struct Player has key {
+        points: u64,
     }
 
-    #[test]
-    public fun test_get_price_example(): (u256, u64, u64) {
-        let pair_id = string::utf8(b"BITCOIN/USD");
-        get_price_example(pair_id)
+    public entry fun join(account: &signer) {
+        move_to(account, Player { points: 0 });
+    }
+
+    /// View functions use the #[view] attribute in Move 2.1
+    #[view]
+    public fun get_points(addr: address): u64 acquires Player {
+        if (exists<Player>(addr)) {
+            borrow_global<Player>(addr).points
+        } else {
+            0
+        }
     }
 }
 ```
 
-### Build and Deploy (Move)
+### Build and Test (Move)
 
 ```bash
-# Build package
-minitiad move build
+# Build (Always specify version 2.1 for latest features)
+# If your Move.toml uses "_" for an address, provide it via --named-addresses
+initiad move build --language-version=2.1 --named-addresses my_module=0x2
 
-# Publish package (adjust flags to your chain profile)
-minitiad tx move publish \
-  --from <KEY_NAME> \
-  --gas auto \
-  --gas-adjustment 1.4 \
-  --fees <FEE_AMOUNT><FEE_DENOM> \
-  -y
+# Test
+initiad move test --language-version=2.1 --named-addresses my_module=0x2
 ```
 
 If your environment uses a different publish wrapper, use the equivalent chain-specific command.
@@ -284,6 +300,17 @@ For any deploy flow, return:
 
 ## Gotchas
 
+- **Move Build Hangs**: Building Move packages with the `movevm` git dependency can be extremely slow (several minutes) because it performs a full clone of a large repository.
+  - **Workaround**: Clone the repository into a `deps/` folder at your project root with `--depth 1` and point to it using a `local` dependency in `Move.toml`:
+    ```bash
+    mkdir -p deps && cd deps
+    git clone --depth 1 https://github.com/initia-labs/movevm.git
+    ```
+    ```toml
+    [dependencies]
+    # Adjust relative path if your Move package is in a subdirectory (e.g., ../deps/...)
+    InitiaStdlib = { local = "deps/movevm/precompile/modules/initia_stdlib" }
+    ```
 - Move: module addresses and named addresses must align with deployment config.
 - Wasm: keep query/execute/instantiate boundaries explicit and typed.
 - EVM: pin compiler version and ensure imported Initia interfaces match deployed chain tooling.
