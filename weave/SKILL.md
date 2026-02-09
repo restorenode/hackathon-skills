@@ -21,17 +21,25 @@ The most important step for any user is to run `weave init` interactively. This 
 
 ## Agent Instructions
 
-When a user asks to "prepare the environment" or "launch an appchain" for the first time, your primary instruction should be:
+The Weave CLI workflow has two distinct phases:
 
-**"Please run `weave init` in your terminal and follow the interactive prompts. This will guide you through the entire setup process."**
+1.  **Interactive Setup (Manual)**: `weave init` requires human input for faucets and security decisions. **You cannot run this command.** When a user needs to start or prepare their environment, you must guide them to their terminal.
+    *   **Guidance:** "Please run `weave init` in your terminal. This is a one-time interactive setup to fund your account and launch your rollup."
 
-After the user has completed the interactive `weave init`, you can then assist them with other `weave` commands, such as:
+2.  **Management & Interaction (AI-Assisted)**: Once initialized, you can execute all other commands on the user's behalf. If you are unsure if the setup is complete, run `weave gas-station show` to check for an active account.
 
-*   `weave gas-station show`: To show the gas station address.
-*   `weave rollup`: Manage your appchain. Subcommands: `launch`, `start`, `stop`, `restart`, `log`, `indexer`.
+### Verifying Setup
+...
+
+### Management Commands
+Once the user has finished `weave init` in their terminal, use these commands to assist them:
+
+*   `weave gas-station show`: To show the gas station address and balances.
+*   `weave rollup`: Manage your appchain. Subcommands: `launch`, `start`, `stop`, `restart`, `indexer`.
+    *   **CRITICAL:** `weave rollup log` tails logs indefinitely and will block the agent. Always use `-n <lines>` (e.g., `weave rollup log -n 50`) to avoid hanging the session.
 *   `weave initia`: Manage the Initia L1 node. Subcommands: `init`, `start`, `stop`, `restart`, `log`.
-*   `weave opinit`: Manage OPinit bots (the glue between L1 and L2). Subcommands: `init`, `start`, `stop`, `restart`, `log`, `setup-keys`, `reset`.
-*   `weave relayer`: Manage the IBC relayer between your rollup and L1. Subcommands: `init`, `start`, `stop`, `restart`, `log`.
+*   `weave opinit`: Manage OPinit bots. Subcommands: `init`, `start`, `stop`, `restart`, `log`, `setup-keys`, `reset`.
+*   `weave relayer`: Manage the IBC relayer. Subcommands: `init`, `start`, `stop`, `restart`, `log`.
 
 ## Rollup Interaction (`minitiad`)
 
@@ -92,23 +100,19 @@ minitiad query tx <tx_hash>
 
 ### verify_appchain
 
-Verifies that an appchain is running correctly.
+Verifies that an appchain is running correctly. Use these specific commands for a robust check that avoids configuration issues.
 
 **Usage:**
 
 ```bash
-# Set environment variables for your specific appchain
-export CHAIN_ID="your-chain-id"
-export RPC_URL="http://localhost:26657" # Default for local rollups
+# 1. Check if the Gas Station account is funded
+weave gas-station show
 
-# Configure minitiad to talk to your appchain
-minitiad config set client chain-id "$CHAIN_ID"
-minitiad config set client node "$RPC_URL"
+# 2. Check if the process is running at the OS level (confirms the daemon is up)
+ps aux | grep minitiad | grep -v grep
 
-# Check if blocks are being produced
-minitiad status | jq -r '.SyncInfo.latest_block_height'
-
-# Check the balance of a genesis account
-# (replace 'mykey' with the key name you chose during `weave init`)
-minitiad query bank balances $(minitiad keys show mykey -a)
+# 3. Check block height directly via RPC
+# Set RPC_URL to your node's address (default is localhost:26657)
+export RPC_URL="http://localhost:26657"
+curl -s $RPC_URL/status | jq '.result.sync_info.latest_block_height'
 ```
