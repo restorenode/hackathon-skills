@@ -28,11 +28,13 @@ When a user asks to "prepare the environment" or "launch an appchain" for the fi
 After the user has completed the interactive `weave init`, you can then assist them with other `weave` commands, such as:
 
 *   `weave gas-station show`: To show the gas station address.
-*   `weave rollup list`: To list the running rollups.
-*   `weave rollup stop`: To stop a rollup.
-*   `weave rollup start`: To start a rollup.
-*   `weave rollup restart`: To restart a rollup.
-*   `weave rollup log`: To view the logs of a rollup.
+*   `weave rollup`: Manage your appchain. Subcommands: `launch`, `start`, `stop`, `restart`, `log`, `indexer`.
+*   `weave initia`: Manage the Initia L1 node. Subcommands: `init`, `start`, `stop`, `restart`, `log`.
+*   `weave opinit`: Manage OPinit bots (the glue between L1 and L2). Subcommands: `init`, `start`, `stop`, `restart`, `log`, `setup-keys`, `reset`.
+*   `weave relayer`: Manage the IBC relayer between your rollup and L1. Subcommands: `init`, `start`, `stop`, `restart`, `log`.
+*   `weave initia`: To manage the Initia L1 node.
+*   `weave opinit`: To manage OPinit bots (the glue between L1 and L2).
+*   `weave relayer`: To manage the IBC relayer between your rollup and L1.
 
 ## Core Commands
 
