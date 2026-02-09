@@ -1,5 +1,5 @@
 ---
-name: initia-frontend-kit
+name: frontend-kit
 description: 'Provides context to build frontends that integrate with Initia, identifying correct React hooks and provider patterns.'
 ---
 
@@ -150,10 +150,11 @@ const querySmartContract = async (walletAddress) => {
 };
 ```
 
-To execute functions on your smart contract, you construct a `MsgExecute` message and pass it to `requestTxBlock` (or `submitTxBlock`).
+To execute functions on your smart contract, you construct a `MsgExecute` message using Protobufs and pass it to `requestTxBlock` (or `submitTxBlock`). You must also serialize arguments using `bcs`.
 
 ```tsx
-import { MsgExecute } from '@initia/initia-js';
+import { MsgExecute } from "@initia/initia.proto/initia/move/v1/tx";
+import { bcs } from "@initia/initia.js";
 import { useInterwovenKit } from "@initia/interwovenkit-react";
 
 const ExecuteContractFunction = () => {
@@ -166,14 +167,17 @@ const ExecuteContractFunction = () => {
       return;
     }
     const messages = [
-      new MsgExecute(
-        initiaAddress, // sender
-        MODULE_ADDRESS, // contract_address
-        'items', // module_name
-        'mint_shard', // function_name
-        [], // type_args
-        [1] // args (e.g., amount of shards to mint)
-      ),
+      {
+        typeUrl: "/initia.move.v1.MsgExecute",
+        value: MsgExecute.fromPartial({
+          sender: initiaAddress,
+          moduleAddress: MODULE_ADDRESS,
+          moduleName: 'items',
+          functionName: 'mint_shard',
+          typeArgs: [],
+          args: [bcs.u64().serialize(1).toBytes()], // Serialize arguments (e.g., amount = 1)
+        }),
+      },
     ];
 
     try {
