@@ -37,6 +37,8 @@ Then ask a context-specific confirmation:
 | Frontend provider order (InterwovenKit path) | Query -> Wagmi -> InterwovenKit | Baseline path |
 | Rollup DA | `INITIA` | Prefer Celestia only when explicitly needed |
 | Rollup moniker | `operator` | Override for production naming |
+| Gas Station Key | `gas-station` | Default key name used in tutorials |
+| Keyring Backend | `test` | Use `--keyring-backend test` for hackathon tools |
 | EVM denom | `GAS` | Typical test/internal default |
 | Move/Wasm denom | `umin` | Typical default |
 
@@ -52,6 +54,7 @@ When solving an Initia task:
 - Testing/CI and infra layer (RPC/LCD/indexer health)
 2. Resolve runtime context first:
 - If VM/`chain_id`/endpoint values are unknown, run `scripts/verify-appchain.sh --gas-station`.
+- When using the gas station account, prefer `--from gas-station --keyring-backend test`. Check both `~/.initia` and `~/.minitia` if key is not found.
 - If critical values are still missing, run `runtime-discovery.md`.
 - Confirm with user whether discovered local rollup should be used.
 3. For new contract projects, ALWAYS use scaffolding first:
@@ -91,6 +94,7 @@ Do not guess when an authoritative answer can be confirmed from docs.
 
 ## Script Usage
 
+- Tool installation (Weave, Initiad, Minitiad, jq): `scripts/install-tools.sh`
 - Contract scaffolding: `scripts/scaffold-contract.sh`
 - Frontend provider sanity check: `scripts/check-provider-setup.sh`
 - Appchain health verification: `scripts/verify-appchain.sh`
