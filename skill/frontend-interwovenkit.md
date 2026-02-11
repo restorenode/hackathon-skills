@@ -328,6 +328,45 @@ export function buildMintMsg(sender: string, moduleAddress: string, amount: numb
 }
 ```
 
+## Native Features & Advanced Hooks
+
+The `useInterwovenKit()` hook provides several native Initia features:
+
+### Auto-Sign (Session Keys)
+```tsx
+const { autoSign } = useInterwovenKit();
+
+// Enable for a chain
+await autoSign.enable(chainId);
+
+// Check status
+const isEnabled = autoSign.isEnabledByChain[chainId];
+```
+
+### Built-in Drawers
+```tsx
+const { openBridge, openDeposit, openWithdraw } = useInterwovenKit();
+
+// Open the standard bridge UI
+openBridge();
+
+// Open deposit for a specific asset
+openDeposit({ denom: "uinit" });
+```
+
+## Indexer Query Patterns (Rollytics)
+
+Every appchain has a built-in indexer available at `chain.indexerUrl`.
+
+### Get Account Transactions
+`GET ${indexerUrl}/indexer/tx/v1/txs/by_account/${address}?limit=10`
+
+### Get Account NFTs
+`GET ${indexerUrl}/indexer/nft/v1/tokens/by_account/${address}`
+
+### Get Collection Details
+`GET ${indexerUrl}/indexer/nft/v1/collections/${collection_addr}`
+
 ## Gotchas
 
 - Chain mismatch will fail at runtime:

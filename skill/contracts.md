@@ -143,6 +143,21 @@ module my_module::game {
 }
 ```
 
+### Oracle Integration (Move 2.1)
+
+```move
+module my_module::oracle_consumer {
+    use std::string::utf8;
+    use initia_std::oracle::get_price;
+
+    #[view]
+    public fun btc_price(): (u256, u64, u64) {
+        let (price, timestamp, decimals) = get_price(utf8(b"BITCOIN/USD"));
+        (price, timestamp, decimals)
+    }
+}
+```
+
 ### Build and Test (Move)
 
 ```bash

@@ -28,15 +28,28 @@ Create `~/.weave/launch_config.json` using `weave-config-schema.md` defaults.
 
 Run the `Rollup Lifecycle` launch command from `weave-commands.md` with `--vm evm`.
 
-### Step 5: Verify rollup health
+### Step 5: Complete Interwoven Setup (Optional)
 
+To enable bridging and IBC, initialize and start the OPinit bots and the Relayer.
+
+```bash
+# OPinit Executor
+weave opinit init executor
+weave opinit start executor -d
+
+# IBC Relayer
+weave relayer init
+weave relayer start
+```
+
+### Step 6: Verify rollup health
 ```bash
 scripts/verify-appchain.sh --chain-id <CHAIN_ID> --rpc-url <RPC_URL>
 ```
 
 Expected: latest block height > 0.
 
-### Step 6: Implement contract workflow
+### Step 7: Implement contract workflow
 
 Use `contracts.md` for the VM-specific scaffold/build/deploy flow.
 
@@ -46,7 +59,7 @@ For a minimal starter:
 scripts/scaffold-contract.sh <evm|move|wasm> <target-dir>
 ```
 
-### Step 7: Wire frontend providers
+### Step 8: Wire frontend providers
 
 Choose frontend path by VM:
 - `evm` (default): use `frontend-evm-rpc.md`, then verify:
@@ -61,7 +74,7 @@ scripts/check-provider-setup.sh --mode evm-rpc <providers-file.tsx>
 scripts/check-provider-setup.sh --mode interwovenkit <providers-file.tsx>
 ```
 
-### Step 8: Run transaction smoke test
+### Step 9: Run transaction smoke test
 
 Use wallet connect + one tx flow from the chosen frontend reference file.
 Expected: transaction hash returned and visible in logs/explorer.
@@ -100,7 +113,26 @@ Confirm frontend runtime values match rollup:
 - module addresses (if contract calls are enabled)
 - environment defaults (`TESTNET` vs `MAINNET`) and wallet active network
 
-## Recipe 3: Debug Broken End-to-End Flow
+## Recipe 3: Powering Up with Native Features
+
+Use this when the user wants to add advanced Initia features to their project.
+
+### Step 1: Oracle Integration (DeFi/Trading)
+Add `initia_std::oracle` to Move contracts or use `ISlinky` in Solidity.
+- **Prompt:** "Add a BTC/USD price query to my smart contract."
+- **Action:** See `contracts.md` for snippets.
+
+### Step 2: Auto-signing (Gaming/High-Frequency)
+Enable the `autoSign` feature in the frontend for a web2-like UX.
+- **Prompt:** "Enable auto-signing in my React frontend for the 'mint' action."
+- **Action:** Use `autoSign.enable(chainId)` from `useInterwovenKit`.
+
+### Step 3: Indexer Integration (Rich Data)
+Use the `indexerUrl` for querying NFTs and transaction history.
+- **Prompt:** "Show me how to fetch all NFTs for the current user using the indexer."
+- **Action:** Use the REST patterns in `frontend-interwovenkit.md`.
+
+## Recipe 4: Debug Broken End-to-End Flow
 
 ### Step 1: Isolate layer
 
