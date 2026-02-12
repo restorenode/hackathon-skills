@@ -201,16 +201,24 @@ minitiad tx move execute <MODULE_ADDRESS> <MODULE_NAME> <FUNCTION_NAME> \
   --chain-id <CHAIN_ID> \
   --gas auto --gas-adjustment 1.4 --yes
 
-# Example:
-# minitiad tx move execute 0x1 items mint_shard --args '["u64:5"]' --from gas-station ...
-
 # 2. Call a view function
 minitiad query move view <MODULE_ADDRESS> <MODULE_NAME> <FUNCTION_NAME> \
   --args <JSON_ARGS_ARRAY>
-
-# Example:
-# minitiad query move view 0x1 items view_inventory --args '["address:init1..."]'
 ```
+
+#### Move Argument Formatting (CRITICAL)
+When using `--args` in `minitiad`, you MUST prefix values with their Move type to ensure correct BCS serialization.
+
+| Type | Prefix Example |
+|---|---|
+| Address | `"address:0x1"` or `"address:init1..."` |
+| U64 | `"u64:100"` |
+| Bool | `"bool:true"` |
+| String | `"string:hello"` |
+| Vector | `"vector<u8>:1,2,3"` |
+
+Example:
+`minitiad query move view <ADDR> <MOD> <FUNC> --args '["address:init1...", "u64:5"]'`
 
 ## WasmVM (CosmWasm)
 
@@ -386,8 +394,13 @@ For any deploy flow, return:
 
 ## Gotchas
 
-- **Move Build Hangs**: Building Move packages with the `movevm` git dependency can be extremely slow (several minutes) because it performs a full clone of a large repository.
-  - **Workaround**: Clone the repository into a `deps/` folder at your project root with `--depth 1` and point to it using a `local` dependency in `Move.toml`:
+- **Move Build Hangs (Automatic Fix)**: Building Move packages with git dependencies is slow. 
+  - **AI Strategy**: When starting a Move project, the AI should automatically set up a local `deps/` folder for the Initia framework to ensure fast builds. 
+  - **Action**: Use `scripts/scaffold-contract.sh move <dir>` as the primary path. If modifying an existing project, explain: *"I'm setting up a local `deps/` folder for the Initia framework to speed up your builds."* and then run:
+    `mkdir -p deps && cd deps && git clone --depth 1 https://github.com/initia-labs/movevm.git`
+    Then update `Move.toml` to use `local` paths for dependencies.
+
+- **Move Build Hangs (Manual Workaround)**: Clone the repository into a `deps/` folder at your project root with `--depth 1` and point to it using a `local` dependency in `Move.toml`:
     ```bash
     mkdir -p deps && cd deps
     git clone --depth 1 https://github.com/initia-labs/movevm.git
