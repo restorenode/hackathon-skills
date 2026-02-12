@@ -15,6 +15,20 @@ weave gas-station setup
 weave gas-station show
 ```
 
+### Account Import (Recovery)
+Use these commands to import the Gas Station account into your CLI keychains if it's missing.
+
+```bash
+# Extract your mnemonic from the weave config
+MNEMONIC=$(jq -r '.common.gas_station.mnemonic' ~/.weave/config.json)
+
+# Import into initiad (L1)
+initiad keys add gas-station --recover --keyring-backend test --coin-type 60 --key-type eth_secp256k1 --source <(echo -n "$MNEMONIC")
+
+# Import into minitiad (L2)
+minitiad keys add gas-station --recover --keyring-backend test --coin-type 60 --key-type eth_secp256k1 --source <(echo -n "$MNEMONIC")
+```
+
 ## Rollup Lifecycle
 
 ```bash

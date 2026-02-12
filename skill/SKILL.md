@@ -52,22 +52,47 @@ When solving an Initia task:
 - Appchain/Weave operations layer
 - Integration and transaction execution layer
 - Testing/CI and infra layer (RPC/LCD/indexer health)
-2. Resolve runtime context first:
+
+2. Account & Key Management (CRITICAL):
+- **Primary Account:** Use the `gas-station` account for ALL transactions (L1 and L2) unless the user explicitly provides another.
+- **Key Discovery:** Before running transactions, verify the `gas-station` key exists in the local keychain (`initiad keys show gas-station --keyring-backend test` and `minitiad keys show gas-station --keyring-backend test`).
+- **Auto-Import Flow:** If the `gas-station` key is missing from the keychains, run the following to import it from the Weave configuration. 
+  > **SECURITY NOTE:** This flow is for **Hackathon/Testnet use only**. NEVER auto-import keys from a JSON config if the target network is `mainnet`.
+  ```bash
+  # Check network first - skip auto-import if mainnet
+  # if [[ "$NETWORK" != "mainnet" ]]; then ...
+  MNEMONIC=$(jq -r '.common.gas_station.mnemonic' ~/.weave/config.json)
+  # ...
+  ```
+
+3. Funding User Wallets (Frontend Readiness):
+- Developers need tokens in their browser wallets (e.g., Keplr or Leap) to interact with their appchain and the Initia L1.
+- When a user provides an address and asks for funding, you should ideally fund them on **both layers**:
+  - **L2 Funding (Appchain):** Essential for gas on their rollup. (`scripts/fund-user.sh --address <init1...> --layer l2`)
+  - **L1 Funding (Initia):** Needed for bridging and L1 features. (`scripts/fund-user.sh --address <init1...> --layer l1`)
+- Always verify the balance of the gas-station account before attempting to fund a user.
+
+4. Resolve runtime context:
 - If VM/`chain_id`/endpoint values are unknown, run `scripts/verify-appchain.sh --gas-station`.
-- When using the gas station account, prefer `--from gas-station --keyring-backend test`. Check both `~/.initia` and `~/.minitia` if key is not found.
+- When using the gas station account, ALWAYS use `--from gas-station --keyring-backend test`.
+- Note: `initiad` usually looks in `~/.initia` and `minitiad` usually looks in `~/.minitia` for keys.
 - If critical values are still missing, run `runtime-discovery.md`.
 - Confirm with user whether discovered local rollup should be used.
-3. For new contract projects, ALWAYS use scaffolding first:
+
+5. For new contract projects, ALWAYS use scaffolding first:
 - `scripts/scaffold-contract.sh <move|wasm|evm> <target-dir>`
 - This ensures correct dependency paths (especially for Move) and compile-ready boilerplate.
-4. Pick task-specific references from the Progressive Disclosure list below.
-4. Implement with Initia-specific correctness:
+
+6. Pick task-specific references from the Progressive Disclosure list below.
+
+7. Implement with Initia-specific correctness:
 - Be explicit about network (`testnet`/`mainnet`), VM, `chain_id`, and endpoints (RPC/REST/JSON-RPC).
 - Keep denom and fee values aligned (`l1_config.gas_prices`, `l2_config.denom`, funded genesis balances).
 - Ensure wallet/provider stack matches selected frontend path.
 - Ensure tx message `typeUrl` and payload shape match chain/VM expectations.
 - Keep address formats correct (`init1...`, `0x...`, `celestia1...`) per config field requirements.
-5. Validate before handoff:
+
+8. Validate before handoff:
 - Run layer-specific checks (for example `scripts/verify-appchain.sh --gas-station` to check health and gas station balance).
 - Verify L2 balances for system accounts if the rollup is active.
 - Mark interactive commands clearly when the user must run them.

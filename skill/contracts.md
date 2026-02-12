@@ -226,9 +226,10 @@ pub fn query_price_raw(deps: Deps, oracle_addr: String) -> StdResult<Binary> {
 # Build wasm artifact
 cargo build --target wasm32-unknown-unknown --release
 
-# Upload/store code (example shape, chain-specific flags may vary)
+# Upload/store code (using the default gas-station account)
 minitiad tx wasm store <PATH_TO_WASM> \
-  --from <KEY_NAME> \
+  --from gas-station \
+  --keyring-backend test \
   --gas auto \
   --gas-adjustment 1.4 \
   --fees <FEE_AMOUNT><FEE_DENOM> \
@@ -237,8 +238,9 @@ minitiad tx wasm store <PATH_TO_WASM> \
 # Instantiate contract
 minitiad tx wasm instantiate <CODE_ID> '<INIT_MSG_JSON>' \
   --label <LABEL> \
-  --admin <ADMIN_ADDRESS> \
-  --from <KEY_NAME> \
+  --admin $(minitiad keys show gas-station -a --keyring-backend test) \
+  --from gas-station \
+  --keyring-backend test \
   --gas auto \
   --gas-adjustment 1.4 \
   --fees <FEE_AMOUNT><FEE_DENOM> \
@@ -287,21 +289,23 @@ contract OracleConsumer {
 
 ### Build and Deploy (EVM)
 
+> **Note:** For EVM deployment, retrieve your private key using the `initia-appchain-dev` skill or by manually inspecting your keychain.
+
 ```bash
 # Build
 forge build
 
-# Deploy from script
+# Deploy from script (using gas-station private key)
 forge script script/Deploy.s.sol:Deploy \
   --rpc-url <EVM_RPC_URL> \
-  --private-key <PRIVATE_KEY> \
+  --private-key <GAS_STATION_PRIVATE_KEY> \
   --broadcast
 
 # Or direct deployment
 forge create src/OracleConsumer.sol:OracleConsumer \
   --constructor-args <SLINKY_ADDRESS> \
   --rpc-url <EVM_RPC_URL> \
-  --private-key <PRIVATE_KEY>
+  --private-key <GAS_STATION_PRIVATE_KEY>
 ```
 
 ## Deployment Output Expectations
