@@ -75,12 +75,12 @@ echo "Chain ID:  $CHAIN_ID"
 echo "--------------------"
 
 # Execute transfer
-$BINARY tx bank send "$KEY_NAME" "$ADDR" "$FINAL_AMOUNT" 
-  --from "$KEY_NAME" 
-  --keyring-backend "$KEYRING" 
-  --chain-id "$CHAIN_ID" 
-  --gas auto --gas-adjustment 1.4 
-  --fees "10000${DEFAULT_DENOM}" 
+$BINARY tx bank send "$KEY_NAME" "$ADDR" "$FINAL_AMOUNT" \
+  --from "$KEY_NAME" \
+  --keyring-backend "$KEYRING" \
+  --chain-id "$CHAIN_ID" \
+  --gas auto --gas-adjustment 1.4 \
+  --fees "10000${DEFAULT_DENOM}" \
   --yes
 
 echo ""
