@@ -163,13 +163,54 @@ module my_module::oracle_consumer {
 ```bash
 # Build (Always specify version 2.1 for latest features)
 # If your Move.toml uses "_" for an address, provide it via --named-addresses
-initiad move build --language-version=2.1 --named-addresses my_module=0x2
+minitiad move build --language-version=2.1 --named-addresses my_module=0x2
 
 # Test
-initiad move test --language-version=2.1 --named-addresses my_module=0x2
+minitiad move test --language-version=2.1 --named-addresses my_module=0x2
 ```
 
-If your environment uses a different publish wrapper, use the equivalent chain-specific command.
+### Deploy and Publish (Move)
+
+The automated `deploy` command builds and publishes the entire package in one step.
+
+```bash
+# 1. Automated Deploy (Recommended)
+# Run this from your Move project root
+minitiad move deploy \
+  --from gas-station \
+  --keyring-backend test \
+  --chain-id <CHAIN_ID> \
+  --gas auto --gas-adjustment 1.4 --yes
+
+# 2. Manual Publish (Specific bytecode files)
+minitiad tx move publish <PATH_TO_BYTECODE> \
+  --from gas-station \
+  --keyring-backend test \
+  --chain-id <CHAIN_ID> \
+  --gas auto --gas-adjustment 1.4 --yes
+```
+
+### Execute and Query (Move)
+
+```bash
+# 1. Execute a function (entry point)
+minitiad tx move execute <MODULE_ADDRESS> <MODULE_NAME> <FUNCTION_NAME> \
+  --args <JSON_ARGS_ARRAY> \
+  --from gas-station \
+  --keyring-backend test \
+  --chain-id <CHAIN_ID> \
+  --gas auto --gas-adjustment 1.4 --yes
+
+# Example:
+# minitiad tx move execute 0x1 items mint_shard --args '["u64:5"]' --from gas-station ...
+
+# 2. Call a view function
+minitiad query move view <MODULE_ADDRESS> <MODULE_NAME> <FUNCTION_NAME> \
+  --args <JSON_ARGS_ARRAY>
+
+# Example:
+# minitiad query move view 0x1 items view_inventory --args '["address:init1..."]'
+```
 
 ## WasmVM (CosmWasm)
 
@@ -289,23 +330,49 @@ contract OracleConsumer {
 
 ### Build and Deploy (EVM)
 
-> **Note:** For EVM deployment, retrieve your private key using the `initia-appchain-dev` skill or by manually inspecting your keychain.
+> **Note:** For EVM deployment, you can use Foundry (recommended) or the `minitiad` CLI for raw bytecode.
+
+#### Option 1: Foundry (Recommended)
 
 ```bash
 # Build
 forge build
 
-# Deploy from script (using gas-station private key)
+# Deploy (using gas-station private key)
 forge script script/Deploy.s.sol:Deploy \
   --rpc-url <EVM_RPC_URL> \
   --private-key <GAS_STATION_PRIVATE_KEY> \
   --broadcast
+```
 
-# Or direct deployment
-forge create src/OracleConsumer.sol:OracleConsumer \
-  --constructor-args <SLINKY_ADDRESS> \
-  --rpc-url <EVM_RPC_URL> \
-  --private-key <GAS_STATION_PRIVATE_KEY>
+#### Option 2: Minitiad CLI (Raw Bytecode)
+
+```bash
+# Deploy a contract from a .bin file
+minitiad tx evm create <PATH_TO_BIN> \
+  --from gas-station \
+  --keyring-backend test \
+  --chain-id <CHAIN_ID> \
+  --gas auto --gas-adjustment 1.4 --yes
+
+# Example with constructor arguments (hex encoded)
+# minitiad tx evm create MyContract.bin --input 010203... --from gas-station ...
+```
+
+### Execute and Query (EVM CLI)
+
+```bash
+# Execute a contract call
+minitiad tx evm call <CONTRACT_ADDRESS> <INPUT_HEX> \
+  --from gas-station \
+  --keyring-backend test \
+  --chain-id <CHAIN_ID> \
+  --gas auto --gas-adjustment 1.4 --yes
+
+# Query EVM state (via JSON-RPC)
+curl -X POST -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","method":"eth_call","params":[{"to":"0x...","data":"0x..."},"latest"],"id":1}' \
+  <EVM_RPC_URL>
 ```
 
 ## Deployment Output Expectations
