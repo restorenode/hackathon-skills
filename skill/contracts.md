@@ -189,9 +189,18 @@ minitiad move test --language-version=2.1 --named-addresses my_module=0x2
 
 The automated `deploy` command builds and publishes the entire package in one step.
 
+**CRITICAL: Address Matching**
+Initia requires the module address in `Move.toml` to match the sender's address during deployment.
+1.  **Get Hex Address**: Convert your bech32 address (e.g., `init1...`) to hex using `scripts/to_hex.py`.
+2.  **Update Move.toml**: Replace the placeholder address in `Move.toml` with the **hex** version of your sender address.
+    *   Example: `my_module = "0x6698..."`
+3.  **Clean Build**: If you encounter `MODULE_ADDRESS_DOES_NOT_MATCH_SENDER`, delete the `build/` directory and rebuild.
+
 ```bash
 # 1. Automated Deploy (Recommended)
 # Run this from your Move project root
+# It is recommended to build explicitly first to ensure address resolution
+minitiad move build --language-version=2.1
 minitiad move deploy \
   --from gas-station \
   --keyring-backend test \
