@@ -119,7 +119,7 @@ Do not guess when an authoritative answer can be confirmed from docs.
 
 ## Script Usage
 
-- Tool installation (Weave, Initiad, Minitiad, jq): `scripts/install-tools.sh`
+- Tool installation (Weave, Initiad, jq): `scripts/install-tools.sh`
 - Contract scaffolding: `scripts/scaffold-contract.sh`
 - Frontend provider sanity check: `scripts/check-provider-setup.sh`
 - Appchain health verification: `scripts/verify-appchain.sh`

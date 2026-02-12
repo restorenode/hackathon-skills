@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 
 # Initia Hackathon Tool Installer
-# Installs: jq, weave, initiad, minitiad (minimove)
+# Installs: jq, weave, initiad
 
 set -e
 
 # Versions
-INITIAD_VERSION="v0.2.15"
-WEAVE_VERSION="v0.3.3"
-MINIMOVE_VERSION="v0.2.13"
+INITIAD_VERSION="v1.3.0"
+WEAVE_VERSION="v0.3.5"
 
 # Paths
 INSTALL_DIR="$HOME/.local/bin"
@@ -91,51 +90,62 @@ else
 fi
 
 # 3. Install Weave
-log "Installing Weave ($WEAVE_VERSION)..."
-WEAVE_URL="https://github.com/initia-labs/weave/releases/download/${WEAVE_VERSION}/weave-${WEAVE_VERSION}-${OS_TYPE}-${ARCH_TYPE}"
-curl -L -o "$INSTALL_DIR/weave" "$WEAVE_URL"
-chmod +x "$INSTALL_DIR/weave"
-
-# 4. Install initiad
-log "Installing initiad ($INITIAD_VERSION)..."
-# Check if archived or binary
-# Usually: https://github.com/initia-labs/initia/releases/download/v0.2.15/initia_v0.2.15_Darwin_arm64.tar.gz
-# Need to verify naming convention.
-# Naming is often: initia_v0.2.15_Darwin_arm64.tar.gz
-# Let's assume tar.gz for initiad based on common Go releaser patterns.
-# Correction: Search results implied binaries on release page.
-# I will use a robust guess or fall back to error.
-# Common: initia_v0.2.15_Linux_x86_64.tar.gz
-# Capitalization of OS might matter (Darwin vs darwin). GoReleaser usually uses "Darwin".
-OS_TITLE="$(tr '[:lower:]' '[:upper:]' <<< ${OS_TYPE:0:1})${OS_TYPE:1}"
-INITIAD_ASSET="initia_${INITIAD_VERSION}_${OS_TITLE}_${ARCH_TYPE}.tar.gz"
-INITIAD_URL="https://github.com/initia-labs/initia/releases/download/${INITIAD_VERSION}/${INITIAD_ASSET}"
-
-log "Downloading $INITIAD_URL ..."
-curl -L -o /tmp/initiad.tar.gz "$INITIAD_URL"
-if tar -tzf /tmp/initiad.tar.gz &>/dev/null; then
-    tar -xzf /tmp/initiad.tar.gz -C "$INSTALL_DIR" initiad
-    rm /tmp/initiad.tar.gz
-    chmod +x "$INSTALL_DIR/initiad"
+log "Checking Weave ($WEAVE_VERSION)..."
+if command -v weave &> /dev/null; then
+    log "Weave is already installed: $(weave version)"
 else
-    error "Failed to download/extract initiad. Please install manually."
+    if [[ "$OS_TYPE" == "darwin" ]]; then
+        if command -v brew &> /dev/null; then
+            log "Installing Weave via Homebrew..."
+            brew install initia-labs/tap/weave || true
+        fi
+    fi
+
+    if ! command -v weave &> /dev/null; then
+        # Fallback to direct download if brew fails or on Linux
+        WEAVE_URL="https://github.com/initia-labs/weave/releases/download/${WEAVE_VERSION}/weave-${WEAVE_VERSION:1}-${OS_TYPE}-${ARCH_TYPE}.tar.gz"
+        log "Downloading Weave from $WEAVE_URL..."
+        curl -L -o /tmp/weave.tar.gz "$WEAVE_URL"
+        if tar -tzf /tmp/weave.tar.gz &>/dev/null; then
+            tar -xzf /tmp/weave.tar.gz -C "$INSTALL_DIR"
+            chmod +x "$INSTALL_DIR/weave"
+        else
+            # Try direct binary download
+            WEAVE_BIN_URL="https://github.com/initia-labs/weave/releases/download/${WEAVE_VERSION}/weave-${WEAVE_VERSION:1}-${OS_TYPE}-${ARCH_TYPE}"
+            curl -L -o "$INSTALL_DIR/weave" "$WEAVE_BIN_URL"
+            chmod +x "$INSTALL_DIR/weave"
+        fi
+    fi
 fi
 
-# 5. Install minitiad (minimove)
-log "Installing minitiad (minimove $MINIMOVE_VERSION)..."
-# Similar naming? https://github.com/initia-labs/minimove/releases/download/v0.2.13/minimove_v0.2.13_Darwin_arm64.tar.gz
-MINIMOVE_ASSET="minimove_${MINIMOVE_VERSION}_${OS_TITLE}_${ARCH_TYPE}.tar.gz"
-MINIMOVE_URL="https://github.com/initia-labs/minimove/releases/download/${MINIMOVE_VERSION}/${MINIMOVE_ASSET}"
-
-log "Downloading $MINIMOVE_URL ..."
-curl -L -o /tmp/minimove.tar.gz "$MINIMOVE_URL"
-if tar -tzf /tmp/minimove.tar.gz &>/dev/null; then
-    tar -xzf /tmp/minimove.tar.gz -C "$INSTALL_DIR" minimove
-    mv "$INSTALL_DIR/minimove" "$INSTALL_DIR/minitiad"
-    rm /tmp/minimove.tar.gz
-    chmod +x "$INSTALL_DIR/minitiad"
+# 4. Install initiad
+log "Checking initiad ($INITIAD_VERSION)..."
+if command -v initiad &> /dev/null; then
+    log "initiad is already installed: $(initiad version)"
 else
-    error "Failed to download/extract minimove. Please install manually."
+    # Check if we can build from source first as it's more reliable in this repo
+    # Prioritize root initia directory if it exists as it might be more up to date
+    if [[ -f "../initia/Makefile" ]]; then
+        log "Source found for initia at ../initia. Building from source..."
+        (cd ../initia && make install)
+    elif [[ -f "initia/Makefile" ]]; then
+        log "Source found for initia. Building from source..."
+        (cd initia && make install)
+    else
+        OS_TITLE="$(tr '[:lower:]' '[:upper:]' <<< ${OS_TYPE:0:1})${OS_TYPE:1}"
+        INITIAD_ASSET="initia_${INITIAD_VERSION}_${OS_TITLE}_${ARCH_TYPE}.tar.gz"
+        INITIAD_URL="https://github.com/initia-labs/initia/releases/download/${INITIAD_VERSION}/${INITIAD_ASSET}"
+
+        log "Downloading $INITIAD_URL ..."
+        curl -L -o /tmp/initiad.tar.gz "$INITIAD_URL"
+        if tar -tzf /tmp/initiad.tar.gz &>/dev/null; then
+            tar -xzf /tmp/initiad.tar.gz -C "$INSTALL_DIR" initiad
+            rm /tmp/initiad.tar.gz
+            chmod +x "$INSTALL_DIR/initiad"
+        else
+            error "Failed to download/extract initiad. Please install manually or build from source."
+        fi
+    fi
 fi
 
 # Final PATH check
@@ -145,7 +155,19 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
 fi
 
 log "Installation complete! Verifying..."
-"$INSTALL_DIR/weave" version
-"$INSTALL_DIR/initiad" version --long | head -n 1
-"$INSTALL_DIR/minitiad" version --long | head -n 1
 
+if command -v weave &> /dev/null; then
+    log "weave installed!"
+    echo "  Version: $(weave version)"
+    echo "  Location: $(command -v weave)"
+else
+    error "weave not found in PATH"
+fi
+
+if command -v initiad &> /dev/null; then
+    log "initiad installed!"
+    echo "  Version: $(initiad version)"
+    echo "  Location: $(command -v initiad)"
+else
+    error "initiad not found in PATH"
+fi
