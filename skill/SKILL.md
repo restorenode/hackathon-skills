@@ -77,27 +77,38 @@ When solving an Initia task:
   - **L1 Funding (Initia):** Needed for bridging and L1 features. (`scripts/fund-user.sh --address <init1...> --layer l1`)
 - Always verify the balance of the gas-station account before attempting to fund a user.
 
-5. Resolve runtime context:
+5. Appchain Health & Auto-Startup (CRITICAL):
+- **Detection:** Before any task requiring the appchain (e.g., contracts, transactions, frontend testing), check if it is running.
+- **RPC Discovery:** Default is `http://localhost:26657`, but verify the actual endpoint:
+  - Check `~/.minitia/config/config.toml` (under `[rpc] laddr`)
+  - Or check the local `minitia.config.json` or `~/.minitia/artifacts/config.json`.
+- **Auto-Recovery:** If the RPC is down, do NOT fail immediately. Instead:
+  1. Inform the user: "The appchain appears to be down."
+  2. Attempt to start it: `weave rollup start -d`.
+  3. Wait (~5s) and verify status using `scripts/verify-appchain.sh`.
+- **Verification:** Use `scripts/verify-appchain.sh --gas-station` to ensure both block production and Gas Station readiness.
+
+6. Resolve runtime context:
 - If VM/`chain_id`/endpoint values are unknown, run `scripts/verify-appchain.sh --gas-station`.
 - When using the gas station account, ALWAYS use `--from gas-station --keyring-backend test`.
 - Note: `initiad` usually looks in `~/.initia` and `minitiad` usually looks in `~/.minitia` for keys.
 - If critical values are still missing, run `runtime-discovery.md`.
 - Confirm with user whether discovered local rollup should be used.
 
-6. For new contract projects, ALWAYS use scaffolding first:
+7. For new contract projects, ALWAYS use scaffolding first:
 - `scripts/scaffold-contract.sh <move|wasm|evm> <target-dir>`
 - This ensures correct dependency paths (especially for Move) and compile-ready boilerplate.
 
-7. Pick task-specific references from the Progressive Disclosure list below.
+8. Pick task-specific references from the Progressive Disclosure list below.
 
-8. Implement with Initia-specific correctness:
+9. Implement with Initia-specific correctness:
 - Be explicit about network (`testnet`/`mainnet`), VM, `chain_id`, and endpoints (RPC/REST/JSON-RPC).
 - Keep denom and fee values aligned (`l1_config.gas_prices`, `l2_config.denom`, funded genesis balances).
 - Ensure wallet/provider stack matches selected frontend path.
 - Ensure tx message `typeUrl` and payload shape match chain/VM expectations.
 - Keep address formats correct (`init1...`, `0x...`, `celestia1...`) per config field requirements.
 
-9. Validate before handoff:
+10. Validate before handoff:
 - Run layer-specific checks (for example `scripts/verify-appchain.sh --gas-station` to check health and gas station balance).
 - Verify L2 balances for system accounts if the rollup is active.
 - Mark interactive commands clearly when the user must run them.
