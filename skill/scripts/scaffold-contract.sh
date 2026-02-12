@@ -28,13 +28,14 @@ case "$vm" in
     mkdir -p "$target/sources"
     mkdir -p "$target/deps"
     
-    echo "Cloning movevm locally for fast builds (depth 1)..."
+    echo "Cloning movevm locally for fast builds (latest main)..."
     git clone --depth 1 https://github.com/initia-labs/movevm.git "$target/deps/movevm" > /dev/null 2>&1 || echo "Warning: git clone failed, check connectivity."
 
     cat > "$target/Move.toml" <<TOML
 [package]
 name = "$pkg_name"
 version = "0.0.1"
+edition = "2024.alpha"
 
 [dependencies]
 InitiaStdlib = { local = "deps/movevm/precompile/modules/initia_stdlib" }

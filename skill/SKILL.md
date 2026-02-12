@@ -30,6 +30,7 @@ Then ask a context-specific confirmation:
 | Area | Default | Notes |
 |---|---|---|
 | VM | `evm` | Use `move`/`wasm` only when requested |
+| Move Version | `2.0` | Uses `edition = "2024.alpha"`. Requires `minitiad` v1.1.0+ |
 | Network | `testnet` | Use `mainnet` only when explicitly requested |
 | Frontend (EVM VM) | wagmi + viem direct JSON-RPC | Default for pure EVM apps |
 | Frontend (Move/Wasm or bridge wallet UX) | `@initia/interwovenkit-react` | Use when InterwovenKit features are required |

@@ -132,6 +132,7 @@ module my_module::game {
     }
 
     /// View functions use the #[view] attribute in Move 2.1
+    /// NOTE: Place doc comments AFTER attributes to avoid compiler warnings.
     #[view]
     public fun get_points(addr: address): u64 acquires Player {
         if (exists<Player>(addr)) {
@@ -140,6 +141,21 @@ module my_module::game {
             0
         }
     }
+}
+```
+
+### Abort Code Mapping (Testing)
+When writing tests with `#[expected_failure]`, standard error categories map to specific abort code ranges:
+- `error::invalid_argument(N)` -> `0x10000 + N` (e.g., `0x10001` for argument 1)
+- `error::not_found(N)` -> `0x60000 + N` (e.g., `0x60002` for resource 2)
+- `error::permission_denied(N)` -> `0x50000 + N`
+
+Example:
+```move
+#[test(account = @0x1)]
+#[expected_failure(abort_code = 0x60002, location = my_module::game)]
+fun test_failure(account: &signer) {
+    // ... logic that calls error::not_found(2)
 }
 ```
 
