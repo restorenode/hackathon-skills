@@ -435,6 +435,10 @@ For any deploy flow, return:
     # Adjust relative path if your Move package is in a subdirectory (e.g., ../deps/...)
     InitiaStdlib = { local = "deps/movevm/precompile/modules/initia_stdlib" }
     ```
+
+- **Account Sequence Mismatch**: When sending multiple transactions in rapid succession (e.g., in a loop), you may encounter an `account sequence mismatch` error.
+  - **Fix**: Add a small delay (e.g., `sleep 2`) between transactions or ensure the previous transaction is indexed before sending the next one.
+
 - Move: module addresses and named addresses must align with deployment config.
 - Wasm: keep query/execute/instantiate boundaries explicit and typed.
 - EVM: pin compiler version and ensure imported Initia interfaces match deployed chain tooling.
