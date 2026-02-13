@@ -132,8 +132,8 @@ module my_module::game {
     }
 
     /// View functions use the #[view] attribute in Move 2.1
-    /// NOTE: Place doc comments AFTER attributes to avoid compiler warnings.
     #[view]
+    /// NOTE: Place doc comments AFTER attributes to avoid compiler warnings.
     public fun get_points(addr: address): u64 acquires Player {
         if (exists<Player>(addr)) {
             borrow_global<Player>(addr).points
@@ -179,10 +179,10 @@ module my_module::oracle_consumer {
 ```bash
 # Build (Always specify version 2.1 for latest features)
 # If your Move.toml uses "_" for an address, provide it via --named-addresses
-minitiad move build --language-version=2.1 --named-addresses my_module=0x2
+minitiad move build --named-addresses my_module=0x2
 
 # Test
-minitiad move test --language-version=2.1 --named-addresses my_module=0x2
+minitiad move test --named-addresses my_module=0x2
 ```
 
 ### Deploy and Publish (Move)
@@ -418,6 +418,12 @@ For any deploy flow, return:
 4. One working read or write command to verify deployment.
 
 ## Gotchas
+
+- **Move: Address Mismatch on Deploy**: If you encounter `MODULE_ADDRESS_DOES_NOT_MATCH_SENDER` during `minitiad move deploy`, it means the address defined in your bytecode doesn't match the sender.
+  - **Fix**: Use `--named-addresses <package>=0x<HEX_ADDR> --build --force` in your `deploy` command to recompile with the correct address on the fly.
+
+- **Move: Backward Incompatible Update**: If you see `BACKWARD_INCOMPATIBLE_MODULE_UPDATE`, you are trying to publish a module to an account that already has it, but your new code removes or changes existing public functions/structs.
+  - **Fix**: Either restore the missing functions (even as empty wrappers) or deploy to a fresh account.
 
 - **Move Build Hangs (Automatic Fix)**: Building Move packages with git dependencies is slow. 
   - **AI Strategy**: When starting a Move project, the AI should automatically set up a local `deps/` folder for the Initia framework to ensure fast builds. 

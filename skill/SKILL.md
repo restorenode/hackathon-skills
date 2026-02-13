@@ -30,12 +30,12 @@ Then ask a context-specific confirmation:
 | Area | Default | Notes |
 |---|---|---|
 | VM | `evm` | Use `move`/`wasm` only when requested |
-| Move Version | `2.0` | Uses `edition = "2024.alpha"`. Requires `minitiad` v1.1.0+ |
+| Move Version | `2.1` | Uses `minitiad move build`. Note: `edition = "2024.alpha"` in Move.toml may trigger 'unknown field' warnings but is safe to ignore. |
 | Network | `testnet` | Use `mainnet` only when explicitly requested |
 | Frontend (EVM VM) | wagmi + viem direct JSON-RPC | Default for pure EVM apps |
 | Frontend (Move/Wasm or bridge wallet UX) | `@initia/interwovenkit-react` | Use when InterwovenKit features are required |
 | Frontend wallet flow (InterwovenKit path) | `requestTxBlock` | Prefer confirmation UX |
-| Frontend provider order (InterwovenKit path) | Query -> Wagmi -> InterwovenKit | Baseline path |
+| Frontend provider order (InterwovenKit path) | Wagmi -> Query -> InterwovenKit | Stable path for Initia SDKs |
 | Rollup DA | `INITIA` | Prefer Celestia only when explicitly needed |
 | Rollup moniker | `operator` | Override for production naming |
 | Gas Station Key | `gas-station` | Default key name used in tutorials |
@@ -57,6 +57,7 @@ When solving an Initia task:
 2. Workspace Awareness (CRITICAL):
 - Before scaffolding (e.g., `minitiad move new` or `npm create vite`), check if a project already exists in the current directory (`ls -F`).
 - If the user is already inside a project directory (has a `Move.toml` or `package.json`), do NOT create a new subdirectory unless explicitly asked.
+- **Scaffolding Strategy**: ALWAYS use non-interactive flags (e.g., `npx create-vite@latest frontend --template react -y`) to avoid terminal hangs. If a tool is known to be interactive, prefer manual directory and file creation.
 - When generating files, confirm the absolute path with the user if there is ambiguity.
 
 3. Account & Key Management (CRITICAL):
