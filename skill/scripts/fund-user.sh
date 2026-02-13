@@ -54,6 +54,7 @@ fi
 if [ "$BINARY" == "initiad" ]; then
   DEFAULT_DENOM="uinit"
   [ -z "$CHAIN_ID" ] && CHAIN_ID="initiation-2"
+  EXTRA_FLAGS="--node https://rpc.testnet.initia.xyz:443 --gas-prices 0.015uinit"
 else
   # For L2, try to read from minitia.config.json if in current dir
   if [ -f "minitia.config.json" ]; then
@@ -62,10 +63,15 @@ else
   else
     DEFAULT_DENOM="uapp"
   fi
+  EXTRA_FLAGS=""
 fi
 
-# Final Amount string
-FINAL_AMOUNT="${USER_AMOUNT:-${AMOUNT}${DEFAULT_DENOM}}"
+# Final Amount string - check if USER_AMOUNT already has a denom
+if [[ "$USER_AMOUNT" =~ ^[0-9]+[a-z]+$ ]]; then
+  FINAL_AMOUNT="$USER_AMOUNT"
+else
+  FINAL_AMOUNT="${USER_AMOUNT:-${AMOUNT}}${DEFAULT_DENOM}"
+fi
 
 echo "--- Funding User ---"
 echo "Recipient: $ADDR"
@@ -80,7 +86,7 @@ $BINARY tx bank send "$KEY_NAME" "$ADDR" "$FINAL_AMOUNT" \
   --keyring-backend "$KEYRING" \
   --chain-id "$CHAIN_ID" \
   --gas auto --gas-adjustment 1.4 \
-  --fees "10000${DEFAULT_DENOM}" \
+  $EXTRA_FLAGS \
   --yes
 
 echo ""

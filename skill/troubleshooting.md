@@ -85,21 +85,39 @@ scripts/check-provider-setup.sh --mode interwovenkit <providers-file.tsx>
 
 Symptoms:
 - Runtime error like `Chain not found: <CHAIN_ID>`.
+- Runtime error like `URL not found`.
 
 Checks:
-- Do not mix `TESTNET` config with mainnet chain id (`interwoven-1`).
+- Ensure `customChain` is passed to `InterwovenKitProvider`.
+- **CRITICAL**: The `apis` object in `customChain` MUST include `rpc`, `rest`, AND an `indexer` array (even if it's a placeholder like `[{ address: "http://localhost:8080" }]`). The kit will crash if any are missing.
 - For testnet, prefer `defaultChainId={TESTNET.defaultChainId}`.
-- Ensure wallet network, frontend defaults, and endpoints target the same environment.
 
-### 7. Transaction submission fails
+### 7. Global Errors (Buffer/Process)
+
+Symptoms:
+- `ReferenceError: Buffer is not defined`
+- `Module "buffer" has been externalized for browser compatibility`
+
+Fix:
+- Install `buffer`, `util`, and `vite-plugin-node-polyfills`.
+- In `main.jsx`, initialize the globals:
+  ```javascript
+  import { Buffer } from 'buffer'
+  window.Buffer = Buffer
+  window.process = { env: {} }
+  ```
+- Add the `nodePolyfills` plugin to `vite.config.js`.
+
+### 8. Transaction submission or Query fails
 
 Checks:
 - Wallet connected and `initiaAddress` is present.
-- Correct message `typeUrl` and serialized args.
-- Network/chain values match the active wallet environment.
+- **SDK Usage**: `LCDClient` is not an export in the current `initia.js`. Use `RESTClient` instead.
+- **View Function 400/500**: Ensure Move arguments are correctly prefixed (e.g., `address:init1...`).
+- **State Reliability**: Prefer `rest.move.resource()` over `viewFunction()` for querying simple contract state (like an Inventory struct).
 - For minievm calls, use `typeUrl: "/minievm.evm.v1.MsgCall"`.
 
-### 8. NPM install interrupted / dependency state corrupted
+### 9. NPM install interrupted / dependency state corrupted
 
 Symptoms:
 - Repeated install errors after timeout/interrupted install (`ENOTEMPTY`, rename conflicts).
@@ -132,7 +150,16 @@ scripts/scaffold-contract.sh <evm|move|wasm> <target-dir>
 
 ## Configuration
 
-### 10. Launch config rejected by Weave
+### 10. Common CLI Errors
+
+| Error | Cause | Fix |
+|---|---|---|
+| `signature verification failed` | Incorrect `chain-id` or account sequence mismatch. | Run `minitiad status` to find the correct `network` (chain-id) and use it in your command. |
+| `failed to convert address field` | Using a Bech32 address (`init1...`) where a key name is expected. | Use the key name (e.g., `gas-station`) or ensure the address is in the local keyring. |
+| `VM aborted: ... code=393218` | Usually a native Initia error (e.g., trying to use an L1 object on L2). | Verify the `denom` and addresses being used match the active layer. |
+| `BACKWARD_INCOMPATIBLE_MODULE_UPDATE` | Attempting to deploy a module with a changed signature to an existing address. | Either restore the old functions/structs or deploy to a fresh address/account. |
+
+### 11. Launch config rejected by Weave
 
 Checks:
 - Field names are snake_case.

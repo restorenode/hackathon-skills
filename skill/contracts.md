@@ -75,9 +75,10 @@ initiad config view
 
 1. Confirm VM and select matching section below.
 2. Produce a minimal compile-ready starter first (`scripts/scaffold-contract.sh <evm|move|wasm> <target-dir>`).
-3. Add feature-specific logic (oracle, execute paths, storage).
-4. Add placeholders for chain/module-specific values.
-5. Provide explicit build/deploy commands for the selected VM.
+3. **Cleanup**: Scaffolding creates a boilerplate file (e.g., `sources/<project_name>.move`). Delete or rename this if you are creating a different module.
+4. Add feature-specific logic (oracle, execute paths, storage).
+5. Add placeholders for chain/module-specific values.
+6. Provide explicit build/deploy commands for the selected VM.
 
 ## MoveVM
 
@@ -98,7 +99,7 @@ scripts/scaffold-contract.sh move ./my-project
 ├── deps/
 │   └── movevm/ (Pre-cloned for speed)
 └── sources/
-    └── <module_name>.move
+    └── <project_name>.move (Boilerplate - delete if creating custom modules)
 ```
 
 ### Baseline Move.toml (Move 2.1)
@@ -107,20 +108,21 @@ scripts/scaffold-contract.sh move ./my-project
 [package]
 name = "MyProject"
 version = "0.0.1"
+edition = "2024.alpha" # Triggers a warning in some compilers, but safe to ignore.
 
 [dependencies]
 InitiaStdlib = { local = "deps/movevm/precompile/modules/initia_stdlib" }
 MoveStdlib = { local = "deps/movevm/precompile/modules/move_stdlib" }
 
 [addresses]
-my_module = "_"
+MyProject = "0x2" # Use a concrete hex address (e.g., 0x2) to allow local builds. This will be overridden during deploy.
 std = "0x1"
 ```
 
 ### Move 2.1 Features Example
 
 ```move
-module my_module::game {
+module MyProject::game {
     use std::signer;
 
     struct Player has key {
@@ -132,8 +134,8 @@ module my_module::game {
     }
 
     /// View functions use the #[view] attribute in Move 2.1
-    /// NOTE: Place doc comments AFTER attributes to avoid compiler warnings.
     #[view]
+    /// NOTE: Place doc comments AFTER attributes to avoid compiler warnings.
     public fun get_points(addr: address): u64 acquires Player {
         if (exists<Player>(addr)) {
             borrow_global<Player>(addr).points
@@ -153,7 +155,7 @@ When writing tests with `#[expected_failure]`, standard error categories map to 
 Example:
 ```move
 #[test(account = @0x1)]
-#[expected_failure(abort_code = 0x60002, location = my_module::game)]
+#[expected_failure(abort_code = 0x60002, location = MyProject::game)]
 fun test_failure(account: &signer) {
     // ... logic that calls error::not_found(2)
 }
@@ -162,7 +164,7 @@ fun test_failure(account: &signer) {
 ### Oracle Integration (Move 2.1)
 
 ```move
-module my_module::oracle_consumer {
+module MyProject::oracle_consumer {
     use std::string::utf8;
     use initia_std::oracle::get_price;
 
@@ -179,10 +181,11 @@ module my_module::oracle_consumer {
 ```bash
 # Build (Always specify version 2.1 for latest features)
 # If your Move.toml uses "_" for an address, provide it via --named-addresses
-minitiad move build --language-version=2.1 --named-addresses my_module=0x2
+# Ensure the named address matches the package name in Move.toml
+minitiad move build --language-version=2.1 --named-addresses MyProject=0x2
 
 # Test
-minitiad move test --language-version=2.1 --named-addresses my_module=0x2
+minitiad move test --language-version=2.1 --named-addresses MyProject=0x2
 ```
 
 ### Deploy and Publish (Move)
@@ -418,6 +421,12 @@ For any deploy flow, return:
 4. One working read or write command to verify deployment.
 
 ## Gotchas
+
+- **Move: Address Mismatch on Deploy**: If you encounter `MODULE_ADDRESS_DOES_NOT_MATCH_SENDER` during `minitiad move deploy`, it means the address defined in your bytecode doesn't match the sender.
+  - **Fix**: Use `--named-addresses <package>=0x<HEX_ADDR> --build --force` in your `deploy` command to recompile with the correct address on the fly.
+
+- **Move: Backward Incompatible Update**: If you see `BACKWARD_INCOMPATIBLE_MODULE_UPDATE`, you are trying to publish a module to an account that already has it, but your new code removes or changes existing public functions/structs.
+  - **Fix**: The preferred fix is to **rename the module** (e.g., from `items` to `items_v2`) in the source code and `Move.toml`. This allows you to keep using the same account (like `gas-station`) without compatibility issues. Only use a fresh account if renaming is not an option for the project.
 
 - **Move Build Hangs (Automatic Fix)**: Building Move packages with git dependencies is slow. 
   - **AI Strategy**: When starting a Move project, the AI should automatically set up a local `deps/` folder for the Initia framework to ensure fast builds. 
