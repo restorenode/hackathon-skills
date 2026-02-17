@@ -115,7 +115,9 @@ Checks:
 - **SDK Usage**: `LCDClient` is not an export in the current `initia.js`. Use `RESTClient` instead.
 - **View Function 400/500**: Ensure Move arguments are correctly prefixed (e.g., `address:init1...`).
 - **State Reliability**: Prefer `rest.move.resource()` over `viewFunction()` for querying simple contract state (like an Inventory struct).
-- For minievm calls, use `typeUrl: "/minievm.evm.v1.MsgCall"`.
+- **EVM Simulation (Hex Prefix)**: `minitiad tx evm call` and `eth_call` often fail if the input hex or contract address is missing the `0x` prefix.
+- **EVM Simulation (Address Format)**: Simulation can fail with "empty address string" if the message fields (e.g., `contractAddr`) don't match the expected casing (camelCase vs snake_case).
+- For minievm calls via InterwovenKit, use `typeUrl: "/minievm.evm.v1.MsgCall"` and ensure fields are **camelCase** (`contractAddr`, `accessList`) if using a raw object.
 
 ### 9. NPM install interrupted / dependency state corrupted
 

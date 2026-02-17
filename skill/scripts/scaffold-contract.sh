@@ -95,12 +95,13 @@ RS
     touch "$target/src/error.rs" "$target/src/msg.rs" "$target/src/state.rs"
     ;;
   evm)
-    mkdir -p "$target/src" "$target/script" "$target/lib"
+    mkdir -p "$target/src" "$target/script" "$target/lib" "$target/test"
     cat > "$target/foundry.toml" <<'TOML'
 [profile.default]
 src = "src"
 out = "out"
 libs = ["lib"]
+test = "test"
 solc_version = "0.8.24"
 TOML
     cat > "$target/src/Example.sol" <<'SOL'
@@ -110,6 +111,25 @@ pragma solidity ^0.8.24;
 contract Example {
     function hello() external pure returns (uint256) {
         return 1;
+    }
+}
+SOL
+    cat > "$target/test/Example.t.sol" <<'SOL'
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+import "forge-std/Test.sol";
+import "../src/Example.sol";
+
+contract ExampleTest is Test {
+    Example public example;
+
+    function setUp() public {
+        example = new Example();
+    }
+
+    function test_Hello() public {
+        assertEq(example.hello(), 1);
     }
 }
 SOL
@@ -157,7 +177,10 @@ minitiad tx evm call <contract-address> $DATA --from gas-station --chain-id <cha
 EOF
 
     # Initialize git and install forge-std
-    (cd "$target" && git init -q && forge install foundry-rs/forge-std --no-commit -q || true)
+    (cd "$target" && git init -q && forge install foundry-rs/forge-std --no-git -q || true)
+    cat > "$target/remappings.txt" <<EOF
+forge-std/=lib/forge-std/src/
+EOF
     ;;
   *)
     usage

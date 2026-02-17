@@ -62,10 +62,12 @@ When solving an Initia task:
   - For contracts: `scripts/scaffold-contract.sh <move|wasm|evm> <target-dir>`
   - For frontends: `scripts/scaffold-frontend.sh <target-dir>`
 - These scripts perform manual directory and file creation, ensuring a 100% non-interactive experience. Avoid using `npx create-vite` or other tools that might prompt for confirmation.
+- **Post-Scaffold Config**: After scaffolding a frontend for a local appchain, you MUST update `src/main.jsx` to include the `customChain` configuration in the `InterwovenKitProvider`. See `frontend-interwovenkit.md` for the standard local appchain config object.
 - When generating files, confirm the absolute path with the user if there is ambiguity.
 
 3. Account & Key Management (CRITICAL):
 - **Primary Account:** Use the `gas-station` account for ALL transactions (L1 and L2) unless the user explicitly provides another.
+- **Address Formats (CLI)**: CLI tools (`initiad`, `minitiad`) generally require bech32 addresses (`init1...`). If a user provides a hex address (`0x...`), use `scripts/convert-address.py` to get the bech32 equivalent before running CLI commands.
 - **Key Discovery:** Before running transactions, verify the `gas-station` key exists in the local keychain (`initiad keys show gas-station --keyring-backend test` and `minitiad keys show gas-station --keyring-backend test`).
 - **Auto-Import Flow:** If the `gas-station` key is missing from the keychains, run the following to import it from the Weave configuration. 
   > **SECURITY NOTE:** This flow is for **Hackathon/Testnet use only**. NEVER auto-import keys from a JSON config if the target network is `mainnet`.
@@ -82,6 +84,9 @@ When solving an Initia task:
   - **L2 Funding (Appchain):** Essential for gas on their rollup. (`scripts/fund-user.sh --address <init1...> --layer l2`)
   - **L1 Funding (Initia):** Needed for bridging and L1 features. (`scripts/fund-user.sh --address <init1...> --layer l1`)
 - Always verify the balance of the gas-station account before attempting to fund a user.
+- **Pro Tip: Token Precision**:
+  - **L1 (INIT)**: The base unit is `uinit` ($10^{-6}$). If a user asks for an amount smaller than $0.000001$ INIT, round up to $1$ `uinit`.
+  - **L2 (Appchain)**: For EVM appchains, the base unit usually has $18$ decimals (like Wei). If a user asks for "1 token", send $10^{18}$ base units (e.g., `1000000000000000000GAS`). Always check `minitiad q bank total` if unsure of the denom or supply.
 
 5. Appchain Health & Auto-Startup (CRITICAL):
 - **Detection:** Before any task requiring the appchain (e.g., contracts, transactions, frontend testing), check if it is running.
@@ -92,10 +97,10 @@ When solving an Initia task:
   1. Inform the user: "The appchain appears to be down."
   2. Attempt to start it: `weave rollup start -d`.
   3. Wait (~5s) and verify status using `scripts/verify-appchain.sh`.
-- **Verification:** Use `scripts/verify-appchain.sh --gas-station` to ensure both block production and Gas Station readiness.
+- **Verification:** Use `scripts/verify-appchain.sh --gas-station --bots` to ensure both block production and Gas Station readiness.
 
 6. Resolve runtime context:
-- If VM/`chain_id`/endpoint values are unknown, run `scripts/verify-appchain.sh --gas-station`.
+- If VM/`chain_id`/endpoint values are unknown, run `scripts/verify-appchain.sh --gas-station --bots`.
 - When using the gas station account, ALWAYS use `--from gas-station --keyring-backend test`.
 - Note: `initiad` usually looks in `~/.initia` and `minitiad` usually looks in `~/.minitia` for keys.
 - If critical values are still missing, run `runtime-discovery.md`.
@@ -104,7 +109,10 @@ When solving an Initia task:
 7. For new contract projects, ALWAYS use scaffolding first:
 - `scripts/scaffold-contract.sh <move|wasm|evm> <target-dir>`
 - This ensures correct dependency paths (especially for Move) and compile-ready boilerplate.
-- **Cleanup**: After scaffolding a Move project, delete the default placeholder module (e.g., `sources/<project_name>.move`) before creating your custom modules to keep the project clean.
+- **Cleanup (Move)**: After scaffolding a Move project, delete the default placeholder module (e.g., `sources/<project_name>.move`) before creating your custom modules to keep the project clean.
+- **Cleanup (EVM)**: After scaffolding an EVM project, delete the default placeholder files (e.g., `src/Example.sol` and `test/Example.t.sol`) before creating your custom contracts.
+- **Foundry Testing (CRITICAL)**: `testFail` is deprecated in newer versions of Foundry and WILL cause test failures in modern environments. ALWAYS use `vm.expectRevert()` for failure testing.
+- **Context Awareness**: Commands like `forge test` and `forge build` MUST be run from the project root (the directory containing `foundry.toml`). Always `cd` into the project directory before executing these.
 
 8. Move 2.1 specific syntax:
 - **Attributes & Documentation**: When using attributes like `#[view]`, ALWAYS place the documentation comment (`/// ...`) **AFTER** the attribute to avoid compiler warnings.
@@ -123,7 +131,7 @@ When solving an Initia task:
 - Keep address formats correct (`init1...`, `0x...`, `celestia1...`) per config field requirements.
 
 10. Validate before handoff:
-- Run layer-specific checks (for example `scripts/verify-appchain.sh --gas-station` to check health and gas station balance).
+- Run layer-specific checks (for example `scripts/verify-appchain.sh --gas-station --bots` to check health and gas station balance).
 - Verify L2 balances for system accounts if the rollup is active.
 - Mark interactive commands clearly when the user must run them.
 

@@ -7,13 +7,14 @@ Use this flow whenever VM, `chain_id`, or endpoint values are unknown.
 The fastest way to verify if a local appchain is running and healthy:
 
 ```bash
-scripts/verify-appchain.sh --gas-station
+scripts/verify-appchain.sh --gas-station --bots
 ```
 
 This will:
 1. Auto-detect `chain_id` from `~/.minitia/artifacts/config.json`.
 2. Check if blocks are being produced.
 3. Show Gas Station L1 and L2 balances.
+4. Check status of OPinit Executor and IBC Relayer.
 
 ## Manual Discovery Commands
 

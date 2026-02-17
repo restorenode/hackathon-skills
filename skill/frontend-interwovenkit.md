@@ -107,7 +107,7 @@ Avoid hard-coded version matrices in this skill.
 // main.jsx
 import { Buffer } from 'buffer'
 window.Buffer = Buffer
-window.process = { env: {} }
+window.process = { env: { NODE_ENV: 'development' } }
 
 import React from 'react'
 import ReactDOM from 'react-dom/client'
@@ -129,21 +129,36 @@ const wagmiConfig = createConfig({
 });
 
 const customChain = {
-  chain_id: "mygame-1",
-  chain_name: "mygame",
+  chain_id: "my-appchain-1",
+  chain_name: "myapp",
   pretty_name: "My Appchain",
   network_type: "testnet",
   bech32_prefix: "init",
+  logo_URIs: {
+    png: "https://raw.githubusercontent.com/initia-labs/initia-registry/main/testnets/initia/images/initia.png",
+    svg: "https://raw.githubusercontent.com/initia-labs/initia-registry/main/testnets/initia/images/initia.svg"
+  },
   apis: {
     rpc: [{ address: "http://localhost:26657" }],
     rest: [{ address: "http://localhost:1317" }],
-    indexer: [{ address: "http://localhost:8080" }], // Required placeholder
+    indexer: [{ address: "http://localhost:8080" }],
+    "json-rpc": [{ address: "http://localhost:8545" }] // REQUIRED for EVM appchains
   },
   fees: {
-    fee_tokens: [{ denom: "umin", fixed_min_gas_price: 0.015 }],
+    fee_tokens: [{ 
+      denom: "GAS", 
+      fixed_min_gas_price: 0,
+      low_gas_price: 0,
+      average_gas_price: 0,
+      high_gas_price: 0
+    }]
+  },
+  staking: {
+    staking_tokens: [{ denom: "GAS" }]
   },
   metadata: {
-    minitia: { type: "minimove" }
+    minitia: { type: "minievm" },
+    is_evm: true
   }
 };
 
@@ -152,7 +167,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <QueryClientProvider client={queryClient}>
       <InterwovenKitProvider 
         {...TESTNET} 
-        defaultChainId="mygame-1" 
+        defaultChainId="my-appchain-1" 
         customChain={customChain}
       >
         <App />
@@ -164,12 +179,15 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
 ## Custom Chain IDs Not In Initia Registry
 
-InterwovenKit supports non-registry chains via `customChain` on `InterwovenKitProvider`.
+InterwovenKit supports non-registry chains via `customChain` (singular) or `customChains` (array) on `InterwovenKitProvider`.
 
 Important behavior:
 
-- `customChain` is prepended to registry results and overrides same `chain_id`.
-- `defaultChainId` must match the chain you want active.
+- `customChain` is the preferred property for a single local appchain.
+- `apis` MUST use the array-of-objects format: `rpc: [{ address: "..." }]`.
+- For `minievm` chains, you MUST include `"json-rpc"` in the `apis` object for internal balance and state queries to resolve.
+- `logo_URIs` and `staking` fields improve stability during chain discovery.
+- `defaultChainId` must match the `chain_id` you want active.
 - If omitted and chain is not in registry/profile sources, runtime can fail with `Chain not found: <CHAIN_ID>`.
 - `apis` MUST include `rpc`, `rest`, and `indexer` (even if indexer is a placeholder).
 
@@ -189,6 +207,40 @@ export function WalletButton() {
   if (!address) return <button onClick={openConnect} className="btn">Connect</button>;
   return <button onClick={openWallet} className="btn">{username ?? shortenAddress(address)}</button>;
 }
+```
+
+## Reference UI Patterns (Optional)
+
+Use these patterns to satisfy the "beautiful and polished" mandate for centered appcard layouts.
+
+### Centered Card & Balance Styles
+```javascript
+const styles = {
+  container: {
+    padding: '40px',
+    width: '100%',
+    maxWidth: '520px',
+    margin: '40px auto',
+    textAlign: 'center',
+    borderRadius: '24px',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+    backgroundColor: '#ffffff',
+    fontFamily: 'system-ui, sans-serif'
+  },
+  balanceContainer: {
+    backgroundColor: '#f1f5f9',
+    padding: '30px',
+    borderRadius: '16px',
+    marginBottom: '30px',
+    border: '1px solid #e2e8f0'
+  },
+  balanceValue: {
+    fontSize: '42px',
+    fontWeight: '800',
+    color: '#2563eb',
+    fontFamily: 'monospace'
+  }
+};
 ```
 
 ## Transaction Patterns
@@ -225,10 +277,58 @@ export function useGameActions() {
 }
 ```
 
+### EVM Contract Execution (`requestTxBlock` flow)
+
+```tsx
+import { useInterwovenKit } from "@initia/interwovenkit-react";
+import { encodeFunctionData } from "viem";
+import { MsgCall } from "@initia/initia.proto/minievm/evm/v1/tx";
+
+const ABI = [ /* ... */ ];
+
+export function useBankActions(contractAddress: string) {
+  const { initiaAddress, requestTxBlock } = useInterwovenKit();
+
+  const deposit = async (amount: string) => {
+    if (!initiaAddress) return;
+
+    const data = encodeFunctionData({
+      abi: ABI,
+      functionName: "deposit",
+    });
+
+    const messages = [{
+      typeUrl: "/minievm.evm.v1.MsgCall", 
+      value: {
+        sender: initiaAddress,
+        contractAddr: contractAddress, // Must be hex (0x...)
+        input: data.startsWith("0x") ? data : `0x${data}`, // Must have 0x prefix for simulation
+        value: amount, // Amount in base units (string)
+        accessList: [],
+      },
+    }];
+
+    return requestTxBlock({ 
+      chainId: "your-appchain-id", // Strongly recommended for appchains
+      messages 
+    });
+  };
+
+  return { deposit };
+}
+```
+
+#### Pro Tip: EVM Dual-Address Requirements
+When interacting with an EVM appchain:
+1. **Querying (`eth_call`)**: Use the **hex address** (`0x...`) for the `from` parameter. You can convert a bech32 address using `AccAddress.toHex(address)`.
+2. **Transacting (`MsgCall`)**: Use the **bech32 address** (`init1...`) for the `sender` field in the message payload. The `contractAddr` should still be **hex** (`0x...`).
+
+- **Note**: When passing a raw object (not using `MsgCall.fromPartial`), you MUST use **camelCase** for the fields (e.g., `contractAddr`, `accessList`) and ensure **both** the address and input have the `0x` prefix to satisfy simulation requirements.
+
 ## Optional Advanced Path: Direct SDK Contract Calls
 
 ```tsx
-import { RESTClient, bcs } from "@initia/initia.js";
+import { RESTClient, bcs, AccAddress } from "@initia/initia.js";
 import { MsgExecute } from "@initia/initia.proto/initia/move/v1/tx";
 
 const rest = new RESTClient("http://localhost:1317", { chainId: "mygame-1" });
@@ -238,9 +338,20 @@ export async function queryInventory(moduleAddress: string, walletAddress: strin
   const structTag = `${moduleAddress}::items::Inventory`;
   return rest.move.resource(walletAddress, structTag);
 }
+
+// Convert bech32 to hex for EVM calls
+export function getHexAddress(address: string) {
+  return address.startsWith("0x") ? address : AccAddress.toHex(address);
+}
 ```
 
 ## Gotchas
+
+- **EVM: Incorrect typeUrl**: For EVM contract calls via `requestTxBlock`, the `typeUrl` usually follows the pattern `/minievm.evm.v1.MsgCall` or `/initia.evm.v1.MsgCall`.
+  - **Fix**: Check your appchain's module name (often `minievm` on rollups) or use `scripts/verify-appchain.sh` to see the module registry.
+
+- **EVM: MsgCall Value Type**: The `value` field in `MsgCall` (for sending native tokens) MUST be a string representing the amount in base units (wei).
+  - **Fix**: Use `parseEther(amount).toString()` to ensure it's a string.
 
 - **Buffer is not defined**: Initia.js uses Node.js globals. Use `vite-plugin-node-polyfills` or manual global assignment.
 - **Chain not found**: Ensure `customChain` is passed to `InterwovenKitProvider` and `defaultChainId` matches.
@@ -248,6 +359,10 @@ export async function queryInventory(moduleAddress: string, walletAddress: strin
 - **LCDClient is not an export**: Use `RESTClient` instead.
 - **View function 400/500 errors**: Ensure arguments are correctly typed strings (e.g., `address:init1...`) and parameters match Move signature exactly. Prefer `resource()` queries for simple state.
 - **Unstyled Modal**: Ensure `styles.css` is imported AND `injectStyles(InterwovenKitStyles)` is called in `main.jsx`.
+
+- **Error: must contain at least one message**: This often occurs if `requestTxBlock` is called without a `chainId` or with a `chainId` that the node doesn't recognize (e.g., trying to send an L2-only message to L1).
+  - **Fix**: Ensure `InterwovenKitProvider` is configured with your `customChain` and `defaultChainId`. Also, explicitly pass `chainId` in the `requestTxBlock` options.
+  - **Note**: When passing a raw object (not using `MsgCall.fromPartial`), ALWAYS use **camelCase** for the fields (e.g., `contractAddr`, `accessList`) to ensure correct processing by the InterwovenKit provider.
 
 ## Install Recovery
 

@@ -9,7 +9,7 @@ ADDRESS=""
 
 usage() {
   cat <<'USAGE'
-Usage: verify-appchain.sh [--chain-id <chain-id>] [--rpc-url <url>] [--key-name <key-name>] [--gas-station] [--address <addr>]
+Usage: verify-appchain.sh [--chain-id <chain-id>] [--rpc-url <url>] [--key-name <key-name>] [--gas-station] [--bots] [--address <addr>]
 
 Options:
   --chain-id     Chain ID (auto-detected from ~/.minitia/artifacts/config.json if omitted)
@@ -17,13 +17,16 @@ Options:
   --key-name     Check balance for a local key name
   --address      Check balance for a specific address
   --gas-station  Check Gas Station status and balances
+  --bots         Check status of OPinit Executor and IBC Relayer
 
 Examples:
   verify-appchain.sh
-  verify-appchain.sh --gas-station
+  verify-appchain.sh --gas-station --bots
   verify-appchain.sh --chain-id myrollup-1 --key-name mykey
 USAGE
 }
+
+CHECK_BOTS=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -45,6 +48,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --gas-station)
       CHECK_GAS_STATION=true
+      shift
+      ;;
+    --bots)
+      CHECK_BOTS=true
       shift
       ;;
     -h|--help)
@@ -127,5 +134,38 @@ if [ "$CHECK_GAS_STATION" = true ]; then
     fi
   else
     echo "weave CLI not found, skipping gas station check."
+  fi
+fi
+
+if [ "$CHECK_BOTS" = true ]; then
+  echo "--- Interwoven Bots Status ---"
+  
+  # Check Executor
+  executor_running=false
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    if launchctl list com.opinitd.executor.daemon >/dev/null 2>&1; then
+      executor_running=true
+    fi
+  else
+    if systemctl is-active --quiet opinitd.executor >/dev/null 2>&1; then
+      executor_running=true
+    fi
+  fi
+
+  if [ "$executor_running" = true ]; then
+    echo "✅ OPinit Executor: Running"
+  else
+    echo "❌ OPinit Executor: Not running"
+  fi
+
+  # Check Relayer
+  if command -v docker >/dev/null 2>&1; then
+    if [ "$(docker ps -q -f name=weave-relayer)" ]; then
+      echo "✅ IBC Relayer: Running (Docker)"
+    else
+      echo "❌ IBC Relayer: Not running"
+    fi
+  else
+    echo "⚠️ Docker not found, cannot check Relayer status."
   fi
 fi

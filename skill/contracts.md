@@ -368,6 +368,25 @@ contract OracleConsumer {
 
 > **Note:** For EVM deployment, you can use Foundry (recommended) or the `minitiad` CLI for raw bytecode.
 
+#### Pro Tip: EVM Unit Testing with `msg.sender`
+If your Solidity contract uses `msg.sender` in a `view` function (e.g., `mapping(address => uint256) balances; ... return balances[msg.sender];`), remember that in Foundry tests:
+1. **State-changing calls**: Use `vm.prank(user)` before the call (e.g., `bank.deposit{value: 1 ether}();`).
+2. **View-only calls**: You MUST also use `vm.prank(user)` before calling the `view` function to check that specific user's balance. Without it, `msg.sender` will be the test contract itself, likely returning `0`.
+3. **Failure Testing**: `testFail` is deprecated in current Foundry versions. Use `vm.expectRevert("ErrorMessage")` followed by the function call that is expected to fail.
+
+Example:
+```solidity
+vm.prank(user);
+bank.deposit{value: 1 ether}();
+vm.prank(user); // REQUIRED to see the user's balance
+assertEq(bank.getBalance(), 1 ether);
+
+// Failure test
+vm.prank(user);
+vm.expectRevert("Insufficient balance");
+bank.withdraw(2 ether);
+```
+
 #### Option 1: Foundry (Recommended)
 
 ```bash
@@ -383,32 +402,80 @@ forge script script/Deploy.s.sol:Deploy \
 
 #### Option 2: Minitiad CLI (Raw Bytecode)
 
+> **Pro Tip**: The `minitiad tx evm create` command expects a **raw hex string** (or a file containing one). It will fail if you pass the full Foundry JSON artifact (e.g., `out/MyContract.json`). Always extract the bytecode first.
+
 ```bash
-# Deploy a contract from a .bin file
-minitiad tx evm create <PATH_TO_BIN> \
+# 1. Build your contract
+forge build
+
+# 2. Extract hex bytecode (requires jq)
+jq -r '.bytecode.object' out/MyContract.sol/MyContract.json | sed 's/^0x//' | tr -d '\n' > MyContract.bin
+
+# 3. Deploy the binary
+minitiad tx evm create MyContract.bin \
   --from gas-station \
   --keyring-backend test \
   --chain-id <CHAIN_ID> \
   --gas auto --gas-adjustment 1.4 --yes
 
+### Retrieving the Contract Address
+The `create` command returns a transaction hash but not the contract address. To find the address, wait for the transaction to be indexed:
+```bash
+sleep 5
+minitiad q tx <TX_HASH> --output json | jq -r '.events[] | select(.type=="contract_created") | .attributes[] | select(.key=="contract") | .value'
+```
+
+
 # Example with constructor arguments (hex encoded)
 # minitiad tx evm create MyContract.bin --input 010203... --from gas-station ...
 ```
 
+### Handling Token Precision
+When users request transactions in "tokens" (e.g., "1 token"):
+- **Default**: Assume standard EVM precision ($10^{18}$ wei).
+- **Supply Check**: Before transacting, check the total supply with `minitiad q bank total`. 
+- **Auto-Scaling**: If the requested amount exceeds the total supply or the account balance, scale the request to a safe value (e.g., use `1000` for "1 token") and explain: *"I've scaled your request to 1,000 units to fit the test environment's supply limits."*
+
+### Finding your Hex Address
+To find the hex address of a bech32 account (like `gas-station`) for use in `eth_call`:
+```bash
+# Note: --address (-a) and --output json are mutually exclusive
+# Use python3 or python depending on your environment
+minitiad keys show gas-station -a --keyring-backend test | xargs -I {} python3 scripts/to_hex.py {}
+```
+Alternatively, look for the `sender` address in the logs of a successful transaction.
+
 ### Execute and Query (EVM CLI)
 
 ```bash
-# Execute a contract call
+# Execute a contract call (State-changing)
 minitiad tx evm call <CONTRACT_ADDRESS> <INPUT_HEX> \
   --from gas-station \
   --keyring-backend test \
   --chain-id <CHAIN_ID> \
   --gas auto --gas-adjustment 1.4 --yes
 
+# Query EVM state (Native CLI - Recommended for agents)
+# minitiad query evm call [sender_bech32] [contract_addr] [input_hex]
+minitiad query evm call $(minitiad keys show gas-station -a --keyring-backend test) <CONTRACT_ADDRESS> <INPUT_HEX>
+
 # Query EVM state (via JSON-RPC)
+# NOTE: "from" is REQUIRED if the function uses msg.sender (like getBalance)
 curl -X POST -H "Content-Type: application/json" \
-  --data '{"jsonrpc":"2.0","method":"eth_call","params":[{"to":"0x...","data":"0x..."},"latest"],"id":1}' \
-  <EVM_RPC_URL>
+  --data '{"jsonrpc":"2.0","method":"eth_call","params":[{"from":"0x...","to":"0x...","data":"0x..."},"latest"],"id":1}' \
+  http://localhost:8545
+
+### Encoding Arguments (CLI)
+For functions with arguments (e.g., `withdraw(uint256)`), use `cast calldata` to generate the input hex. For functions WITHOUT arguments (e.g., `deposit()`), you can use `cast sig`:
+
+```bash
+# Example with arguments
+DATA=$(cast calldata "withdraw(uint256)" 1000)
+
+# Example without arguments
+SIG=$(cast sig "deposit()")
+minitiad tx evm call <CONTRACT_ADDRESS> $SIG --from gas-station ...
+```
 ```
 
 ## Deployment Output Expectations
@@ -421,6 +488,19 @@ For any deploy flow, return:
 4. One working read or write command to verify deployment.
 
 ## Gotchas
+
+- **EVM: Hex Prefix Error**: The `minitiad tx evm call` command requires the `0x` prefix for input hex strings.
+  - **Fix**: Ensure your data starts with `0x` (e.g., `0xd0e30db0`).
+
+- **EVM: eth_call returns 0 or error**: If your Solidity function uses `msg.sender` (like `getBalance()`), you MUST provide a `from` address in your `eth_call` params.
+  - **Fix**: `{"method":"eth_call","params":[{"from":"0x...","to":"0x...","data":"0x..."},"latest"]}`.
+
+- **EVM: Missing Imports (forge-std)**: If `forge build` fails to find `forge-std/Test.sol`, you may need a `remappings.txt` file.
+  - **Fix**: Create a `remappings.txt` file in your project root with the following content:
+    ```text
+    forge-std/=lib/forge-std/src/
+    ```
+  - **Strategy**: Always use `scripts/scaffold-contract.sh evm <dir>` which now automatically sets this up.
 
 - **Move: Address Mismatch on Deploy**: If you encounter `MODULE_ADDRESS_DOES_NOT_MATCH_SENDER` during `minitiad move deploy`, it means the address defined in your bytecode doesn't match the sender.
   - **Fix**: Use `--named-addresses <package>=0x<HEX_ADDR> --build --force` in your `deploy` command to recompile with the correct address on the fly.
@@ -447,6 +527,9 @@ For any deploy flow, return:
 
 - **Account Sequence Mismatch**: When sending multiple transactions in rapid succession (e.g., in a loop), you may encounter an `account sequence mismatch` error.
   - **Fix**: Add a small delay (e.g., `sleep 2`) between transactions or ensure the previous transaction is indexed before sending the next one.
+
+- **Transaction Indexing Latency**: Querying a transaction (e.g., `minitiad q tx <HASH>`) immediately after sending it may return a "not found" error because the block hasn't been indexed.
+  - **Fix**: Add a small delay (e.g., `sleep 5`) before querying transaction results to retrieve contract addresses or event data.
 
 - Move: module addresses and named addresses must align with deployment config.
 - Wasm: keep query/execute/instantiate boundaries explicit and typed.
