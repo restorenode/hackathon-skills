@@ -117,8 +117,47 @@ SOL
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// Fill in deployment logic for your environment.
+import "forge-std/Script.sol";
+
+contract Deploy is Script {
+    function run() external {
+        uint256 deployerPrivateKey = vm.envOr("PRIVATE_KEY", uint256(0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80));
+        vm.startBroadcast(deployerPrivateKey);
+
+        // Deploy logic here
+        
+        vm.stopBroadcast();
+    }
+}
 SOL
+
+    cat > "$target/README.md" <<'EOF'
+# EVM Contract Project
+
+## Building
+```bash
+forge build
+```
+
+## Deploying with minitiad
+Minitiad requires raw hex bytecode. Use the following to extract it:
+```bash
+jq -r '.bytecode.object' out/YourContract.sol/YourContract.json | sed 's/^0x//' | tr -d '\n' > your-contract.bin
+minitiad tx evm create your-contract.bin --from gas-station --chain-id <chain-id> --yes
+```
+
+## Interacting
+Encode your calls using `cast`:
+```bash
+# Get calldata
+DATA=$(cast calldata "functionName(type)" arg1)
+# Send transaction
+minitiad tx evm call <contract-address> $DATA --from gas-station --chain-id <chain-id> --yes
+```
+EOF
+
+    # Initialize git and install forge-std
+    (cd "$target" && git init -q && forge install foundry-rs/forge-std --no-commit -q || true)
     ;;
   *)
     usage

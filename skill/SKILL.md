@@ -57,7 +57,11 @@ When solving an Initia task:
 2. Workspace Awareness (CRITICAL):
 - Before scaffolding (e.g., `minitiad move new` or `npm create vite`), check if a project already exists in the current directory (`ls -F`).
 - If the user is already inside a project directory (has a `Move.toml` or `package.json`), do NOT create a new subdirectory unless explicitly asked.
-- **Scaffolding Strategy**: ALWAYS use non-interactive flags (e.g., `npx create-vite@latest frontend --template react -y`) to avoid terminal hangs. If a tool is known to be interactive, prefer manual directory and file creation.
+- **EVM/Foundry**: If installing libraries (e.g., `forge install`), ensure the directory is a git repository (`git init`) and use `--no-git` to avoid submodule issues if git is not desired.
+- **Scaffolding Strategy**: To avoid terminal hangs or interactive prompts (like "Need to install create-vite?"), ALWAYS use the provided scaffolding scripts:
+  - For contracts: `scripts/scaffold-contract.sh <move|wasm|evm> <target-dir>`
+  - For frontends: `scripts/scaffold-frontend.sh <target-dir>`
+- These scripts perform manual directory and file creation, ensuring a 100% non-interactive experience. Avoid using `npx create-vite` or other tools that might prompt for confirmation.
 - When generating files, confirm the absolute path with the user if there is ambiguity.
 
 3. Account & Key Management (CRITICAL):
@@ -147,6 +151,7 @@ Do not guess when an authoritative answer can be confirmed from docs.
 
 - Tool installation (Weave, Initiad, jq): `scripts/install-tools.sh`
 - Contract scaffolding: `scripts/scaffold-contract.sh`
+- Frontend scaffolding: `scripts/scaffold-frontend.sh`
 - Frontend provider sanity check: `scripts/check-provider-setup.sh`
 - Appchain health verification: `scripts/verify-appchain.sh`
 - Address conversion (hex/bech32): `scripts/convert-address.py`
