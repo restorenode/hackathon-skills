@@ -272,8 +272,8 @@ Conventions:
 
 ```toml
 [dependencies]
-cosmwasm-schema = "2.0.1"
-cosmwasm-std = { version = "2.0.1", features = ["cosmwasm_1_3"] }
+cosmwasm-schema = "2.1.0"
+cosmwasm-std = { version = "2.1.0", features = ["cosmwasm_1_3"] }
 cw-storage-plus = "2.0.0"
 cw2 = "2.0.0"
 schemars = "0.8.16"
@@ -299,9 +299,39 @@ pub fn query_price_raw(deps: Deps, oracle_addr: String) -> StdResult<Binary> {
 
 ### Build and Deploy (Wasm)
 
+**AI Strategy: Command Paths**
+In many environments, `cargo` is not in the default PATH for shell commands. If `cargo` fails, use `~/.cargo/bin/cargo`.
+
+**AI Strategy: Testing**
+In `cosmwasm-std` 2.x, `mock_info` is deprecated. Use `message_info` for new tests to avoid warnings. Use `cosmwasm_std::from_json` and `to_json_binary` for serialization.
+
+**AI Strategy: Dependency Updates**
+After pinning dependencies in `Cargo.toml` (e.g., to fix `edition2024` errors), ALWAYS run `cargo update` (or `~/.cargo/bin/cargo update`) to ensure the lock file is synchronized before building.
+
+**CRITICAL: Build Optimization**
+Standard `cargo build` often produces Wasm files that are too large or contain incompatible features (like `bulk-memory`). ALWAYS use the CosmWasm optimizer for deployment.
+
 ```bash
-# Build wasm artifact
-cargo build --target wasm32-unknown-unknown --release
+# 1. Ensure crate-type is set in Cargo.toml
+# [lib]
+# crate-type = ["cdylib", "rlib"]
+
+# 2. Run the optimizer (Docker required)
+# Use arm64 version for Apple Silicon, otherwise use cosmwasm/optimizer:0.16.1
+docker run --rm -v "$(pwd)":/code \
+  --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
+  --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
+  cosmwasm/optimizer-arm64:0.16.1
+
+# 3. Artifacts will be in ./artifacts/
+```
+
+**Gotcha: Edition 2024 Build Errors**
+If you see errors like `feature edition2024 is required` or `bulk memory support is not enabled`, pin these dependencies in `Cargo.toml`:
+```toml
+rmp = "=0.8.14"
+rmp-serde = "=1.3.0"
+```
 
 # Upload/store code (using the default gas-station account)
 minitiad tx wasm store <PATH_TO_WASM> \
@@ -322,6 +352,31 @@ minitiad tx wasm instantiate <CODE_ID> '<INIT_MSG_JSON>' \
   --gas-adjustment 1.4 \
   --fees <FEE_AMOUNT><FEE_DENOM> \
   -y
+
+### Retrieving the Code ID and Contract Address (Wasm)
+After storing code or instantiating, wait for indexing (~5s) and retrieve the values:
+
+```bash
+# Get Code ID
+minitiad q tx <TX_HASH> --output json | jq -r '.events[] | select(.type=="store_code") | .attributes[] | select(.key=="code_id") | .value'
+
+# Get Contract Address
+minitiad q tx <TX_HASH> --output json | jq -r '.events[] | select(.type=="instantiate") | .attributes[] | select(.key=="_contract_address") | .value'
+```
+
+### Execute and Query (Wasm CLI)
+
+```bash
+# Execute a contract call (State-changing)
+minitiad tx wasm execute <CONTRACT_ADDRESS> '<MSG_JSON>' \
+  --from gas-station \
+  --keyring-backend test \
+  --chain-id <CHAIN_ID> \
+  --gas auto --gas-adjustment 1.4 --yes
+
+# Query contract state (Read-only)
+minitiad query wasm contract-state smart <CONTRACT_ADDRESS> '<QUERY_JSON>'
+```
 ```
 
 ## EVM (Solidity)

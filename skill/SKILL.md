@@ -54,7 +54,15 @@ When solving an Initia task:
 - Integration and transaction execution layer
 - Testing/CI and infra layer (RPC/LCD/indexer health)
 
-2. Workspace Awareness (CRITICAL):
+2. Path & Environment Verification (CRITICAL):
+- Before executing commands, verify that required tools are in the PATH.
+- If `run_shell_command` fails with "command not found", check standard locations:
+  - Rust/Cargo: `~/.cargo/bin/cargo`
+  - EVM/Foundry: `~/.foundry/bin/forge`
+  - Initia/Minitia: `which initiad` or `which minitiad`
+- Use absolute paths if necessary to avoid environment-related failures.
+
+3. Workspace Awareness (CRITICAL):
 - Before scaffolding (e.g., `minitiad move new` or `npm create vite`), check if a project already exists in the current directory (`ls -F`).
 - If the user is already inside a project directory (has a `Move.toml` or `package.json`), do NOT create a new subdirectory unless explicitly asked.
 - **EVM/Foundry**: If installing libraries (e.g., `forge install`), ensure the directory is a git repository (`git init`) and use `--no-git` to avoid submodule issues if git is not desired.
@@ -64,6 +72,7 @@ When solving an Initia task:
 - These scripts perform manual directory and file creation, ensuring a 100% non-interactive experience. Avoid using `npx create-vite` or other tools that might prompt for confirmation.
 - **Post-Scaffold Config**: After scaffolding a frontend for a local appchain, you MUST update `src/main.jsx` to include the `customChain` configuration in the `InterwovenKitProvider`. See `frontend-interwovenkit.md` for the standard local appchain config object.
 - When generating files, confirm the absolute path with the user if there is ambiguity.
+- **Environment Paths (CRITICAL)**: In many environments, `cargo` and `foundry` (forge) binaries are located in `~/.cargo/bin` and `~/.foundry/bin`, respectively. If `run_shell_command` fails to find these tools, verify their existence in these standard locations and use absolute paths if necessary (e.g., `~/.cargo/bin/cargo test`).
 
 3. Account & Key Management (CRITICAL):
 - **Primary Account:** Use the `gas-station` account for ALL transactions (L1 and L2) unless the user explicitly provides another.
@@ -81,12 +90,15 @@ When solving an Initia task:
 4. Funding User Wallets (Frontend Readiness):
 - Developers need tokens in their browser wallets (e.g., Keplr or Leap) to interact with their appchain and the Initia L1.
 - When a user provides an address and asks for funding, you should ideally fund them on **both layers**:
-  - **L2 Funding (Appchain):** Essential for gas on their rollup. (`scripts/fund-user.sh --address <init1...> --layer l2`)
+  - **L2 Funding (Appchain):** Essential for gas on their rollup. (`scripts/fund-user.sh --address <init1...> --layer l2 --chain-id <l2_chain_id>`)
   - **L1 Funding (Initia):** Needed for bridging and L1 features. (`scripts/fund-user.sh --address <init1...> --layer l1`)
+- **Note:** `fund-user.sh` may fail to auto-detect the L2 `chain-id`. Always use `verify-appchain.sh` first to retrieve it and provide it explicitly if needed.
 - Always verify the balance of the gas-station account before attempting to fund a user.
-- **Pro Tip: Token Precision**:
-  - **L1 (INIT)**: The base unit is `uinit` ($10^{-6}$). If a user asks for an amount smaller than $0.000001$ INIT, round up to $1$ `uinit`.
-  - **L2 (Appchain)**: For EVM appchains, the base unit usually has $18$ decimals (like Wei). If a user asks for "1 token", send $10^{18}$ base units (e.g., `1000000000000000000GAS`). Always check `minitiad q bank total` if unsure of the denom or supply.
+- **Pro Tip: Token Precision & Denoms (CRITICAL)**:
+  - **L1 (INIT)**: The base unit is `uinit` ($10^{-6}$). When a user asks for "1 INIT", you MUST send `1000000uinit`.
+  - **L2 (Appchain)**: Denoms vary (e.g., `GAS`, `umin`, `uinit`). ALWAYS check `minitiad q bank total` to verify the native denom before funding.
+  - **Multipliers**: For EVM-compatible rollups, the precision is usually 18 decimals. When a user asks for "1 token", send `1000000000000000000` of the base unit.
+  - **Avoid Script Defaults**: Do not rely on `fund-user.sh` to handle precision or denoms automatically. Explicitly calculate the base unit amount and specify the correct denom in your commands.
 
 5. Appchain Health & Auto-Startup (CRITICAL):
 - **Detection:** Before any task requiring the appchain (e.g., contracts, transactions, frontend testing), check if it is running.
@@ -109,6 +121,9 @@ When solving an Initia task:
 7. For new contract projects, ALWAYS use scaffolding first:
 - `scripts/scaffold-contract.sh <move|wasm|evm> <target-dir>`
 - This ensures correct dependency paths (especially for Move) and compile-ready boilerplate.
+- **WasmVM Deployment (CRITICAL)**: Standard `cargo build` binaries often fail WasmVM validation (e.g., "bulk memory support not enabled"). ALWAYS use the `cosmwasm/optimizer` Docker image to build production-ready binaries.
+- **Transaction Verification**: After a `store` or `instantiate` transaction, if the `code_id` or `contract_address` is missing from the output, query the transaction hash using `minitiad q tx <hash>` (note: `q tx` does NOT take a `--chain-id` flag).
+- **Query Command Flags (NEW)**: Unlike transaction commands (`tx`), many query commands (`query` or `q`) do NOT support the `--chain-id` flag. If a query fails with an "unknown flag" error, try removing the chain-id and node flags.
 - **Cleanup (Move)**: After scaffolding a Move project, delete the default placeholder module (e.g., `sources/<project_name>.move`) before creating your custom modules to keep the project clean.
 - **Cleanup (EVM)**: After scaffolding an EVM project, delete the default placeholder files (e.g., `src/Example.sol` and `test/Example.t.sol`) before creating your custom contracts.
 - **Foundry Testing (CRITICAL)**: `testFail` is deprecated in newer versions of Foundry and WILL cause test failures in modern environments. ALWAYS use `vm.expectRevert()` for failure testing.
@@ -133,6 +148,18 @@ When solving an Initia task:
 10. Validate before handoff:
 - Run layer-specific checks (for example `scripts/verify-appchain.sh --gas-station --bots` to check health and gas station balance).
 - Verify L2 balances for system accounts if the rollup is active.
+- **Visual Polish (NEW)**: Apps should not just be functional; they should be beautiful. Prioritize modern aesthetics:
+  - Use clear spacing (padding/margins).
+  - Prefer card-based layouts for lists.
+  - Center primary Call to Actions (CTAs) like "Connect Wallet" to focus user attention.
+  - **Visual Hierarchy**: Section headers (e.g., "POST A MEMO") should be pronounced (e.g., using uppercase, letter spacing, and a distinct color) to distinguish them from primary content and labels.
+  - Ensure interactive elements (buttons/inputs) have hover/focus feedback.
+  - Use clean typography (system fonts are fine, but ensure hierarchy).
+- **UX/Usability Best Practices (NEW)**:
+  - **Feed Ordering**: For boards/feeds, ALWAYS show the newest content first (reverse chronological) to maintain relevance.
+  - **Input Accessibility**: Place primary interaction points (like input fields for posting) ABOVE the feed to ensure they are accessible without scrolling.
+  - **Section Hierarchy**: Use clear section titles (e.g., "Post a Memo", "Board Feed") to help users navigate and balance the UI.
+- **Cross-Layer Consistency (NEW)**: Ensure naming conventions (fields, variants, methods) are consistent across the contract (Rust/Move), CLI commands, and Frontend implementation. For example, if a contract field is named `message` in Rust, the CLI JSON payload and Frontend state should also use `message`, not `content`. Prefer `snake_case` for all JSON keys to align with standard CosmWasm/EVM/Move serialization.
 - Mark interactive commands clearly when the user must run them.
 
 ## Progressive Disclosure (Read When Needed)

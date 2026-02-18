@@ -156,12 +156,20 @@ scripts/scaffold-contract.sh <evm|move|wasm> <target-dir>
 
 | Error | Cause | Fix |
 |---|---|---|
+| `insufficient gas price` | L1 (initiation-2) requires a base gas price of `0.015uinit`. | Use `--fees` (e.g., `--fees 5000uinit`) to satisfy the requirement. |
+| `account sequence mismatch` | Rapidly sending transactions without waiting for indexing. | Add `sleep 2` between transactions or verify the previous tx is indexed. |
 | `signature verification failed` | Incorrect `chain-id` or account sequence mismatch. | Run `minitiad status` to find the correct `network` (chain-id) and use it in your command. |
+| `invalid denom` or `insufficient funds` | Using incorrect token precision (e.g., 100 vs 10^20). | Query total supply: `minitiad q bank total`. Most L2 tokens (like `umin`) use 18 decimals. |
 | `failed to convert address field` | Using a Bech32 address (`init1...`) where a key name is expected. | Use the key name (e.g., `gas-station`) or ensure the address is in the local keyring. |
-| `VM aborted: ... code=393218` | Usually a native Initia error (e.g., trying to use an L1 object on L2). | Verify the `denom` and addresses being used match the active layer. |
-| `BACKWARD_INCOMPATIBLE_MODULE_UPDATE` | Attempting to deploy a module with a changed signature to an existing address. | Either restore the old functions/structs or deploy to a fresh address/account. |
 
-### 11. Launch config rejected by Weave
+### 11. Network & Chain ID Discovery
+
+If you are unsure of the correct `chain-id` for a layer:
+
+- **L1 (Initia Testnet)**: `initiad status --node https://rpc.testnet.initia.xyz \| jq -r '.NodeInfo.network'` (usually `initiation-2`).
+- **L2 (Local Appchain)**: `minitiad status \| jq -r '.NodeInfo.network'` (usually `social-1`).
+
+### 12. Launch config rejected by Weave
 
 Checks:
 - Field names are snake_case.

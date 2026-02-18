@@ -114,7 +114,7 @@ import React from 'react'
 import { useInterwovenKit } from "@initia/interwovenkit-react";
 
 function App() {
-  const { address, openConnect, openWallet } = useInterwovenKit();
+  const { initiaAddress, openConnect, openWallet } = useInterwovenKit();
 
   const containerStyle = {
     fontFamily: '"Inter", system-ui, -apple-system, sans-serif',
@@ -180,7 +180,7 @@ function App() {
           Welcome to your new Initia appchain frontend!
         </p>
         
-        {!address ? (
+        {!initiaAddress ? (
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <button 
               onClick={openConnect} 
@@ -191,7 +191,7 @@ function App() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div style={addressBadgeStyle}>{address}</div>
+            <div style={addressBadgeStyle}>{initiaAddress}</div>
             <button 
               onClick={openWallet} 
               style={secondaryButtonStyle}

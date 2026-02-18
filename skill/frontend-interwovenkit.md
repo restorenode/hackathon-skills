@@ -202,10 +202,10 @@ function shortenAddress(value: string) {
 }
 
 export function WalletButton() {
-  const { address, username, openWallet, openConnect } = useInterwovenKit();
+  const { initiaAddress, username, openWallet, openConnect } = useInterwovenKit();
 
-  if (!address) return <button onClick={openConnect} className="btn">Connect</button>;
-  return <button onClick={openWallet} className="btn">{username ?? shortenAddress(address)}</button>;
+  if (!initiaAddress) return <button onClick={openConnect} className="btn">Connect</button>;
+  return <button onClick={openWallet} className="btn">{username ?? shortenAddress(initiaAddress)}</button>;
 }
 ```
 
@@ -318,6 +318,40 @@ export function useBankActions(contractAddress: string) {
 }
 ```
 
+### Wasm Contract Execution (`requestTxBlock` flow)
+
+```tsx
+import { useInterwovenKit } from "@initia/interwovenkit-react";
+
+export function useBoardActions(contractAddress: string) {
+  const { initiaAddress, requestTxBlock } = useInterwovenKit();
+
+  const postMessage = async (content: string) => {
+    if (!initiaAddress) return;
+
+    // MsgExecuteContract expects 'msg' as bytes (Uint8Array)
+    const msg = new TextEncoder().encode(JSON.stringify({ post_message: { content } }));
+
+    const messages = [{
+      typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
+      value: {
+        sender: initiaAddress,
+        contract: contractAddress,
+        msg,
+        funds: [],
+      },
+    }];
+
+    return requestTxBlock({ 
+      chainId: "your-appchain-id",
+      messages 
+    });
+  };
+
+  return { postMessage };
+}
+```
+
 #### Pro Tip: EVM Dual-Address Requirements
 When interacting with an EVM appchain:
 1. **Querying (`eth_call`)**: Use the **hex address** (`0x...`) for the `from` parameter. You can convert a bech32 address using `AccAddress.toHex(address)`.
@@ -339,6 +373,13 @@ export async function queryInventory(moduleAddress: string, walletAddress: strin
   return rest.move.resource(walletAddress, structTag);
 }
 
+// CosmWasm query via REST
+export async function queryWasm(contractAddress: string, queryMsg: any) {
+  // Query must be base64 encoded because it's part of the REST URL path
+  const queryData = Buffer.from(JSON.stringify(queryMsg)).toString("base64");
+  return rest.wasm.smartContractState(contractAddress, queryData);
+}
+
 // Convert bech32 to hex for EVM calls
 export function getHexAddress(address: string) {
   return address.startsWith("0x") ? address : AccAddress.toHex(address);
@@ -352,6 +393,12 @@ export function getHexAddress(address: string) {
 
 - **EVM: MsgCall Value Type**: The `value` field in `MsgCall` (for sending native tokens) MUST be a string representing the amount in base units (wei).
   - **Fix**: Use `parseEther(amount).toString()` to ensure it's a string.
+
+- **Wasm: Query 400 Bad Request**: `smartContractState` expects the query to be a Base64-encoded string.
+  - **Fix**: `const queryData = Buffer.from(JSON.stringify(query)).toString("base64"); rest.wasm.smartContractState(addr, queryData);`
+
+- **Wasm: Transaction "invalid payload"**: `MsgExecuteContract` expects the `msg` field as bytes (`Uint8Array`).
+  - **Fix**: Use `new TextEncoder().encode(JSON.stringify(msg))` for the `msg` field.
 
 - **Buffer is not defined**: Initia.js uses Node.js globals. Use `vite-plugin-node-polyfills` or manual global assignment.
 - **Chain not found**: Ensure `customChain` is passed to `InterwovenKitProvider` and `defaultChainId` matches.

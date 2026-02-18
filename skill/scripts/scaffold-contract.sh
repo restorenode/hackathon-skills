@@ -67,32 +67,121 @@ MOVE
     ;;
   wasm)
     mkdir -p "$target/src"
-    cat > "$target/Cargo.toml" <<'TOML'
+    cat > "$target/Cargo.toml" <<TOML
 [package]
-name = "example"
+name = "$pkg_name"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-cosmwasm-schema = "2.0.1"
-cosmwasm-std = { version = "2.0.1", features = ["cosmwasm_1_3"] }
+cosmwasm-schema = "2.1.0"
+cosmwasm-std = { version = "2.1.0", features = ["cosmwasm_1_3"] }
 cw-storage-plus = "2.0.0"
 cw2 = "2.0.0"
 schemars = "0.8.16"
 thiserror = "1.0.58"
 serde = { version = "1.0.197", default-features = false, features = ["derive"] }
+# Pinned to avoid edition 2024 build errors in the optimizer
+rmp = "=0.8.14"
+rmp-serde = "=1.3.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+library = []
 TOML
     cat > "$target/src/lib.rs" <<'RS'
 pub mod contract;
+pub mod error;
+pub mod msg;
+pub mod state;
 RS
-    cat > "$target/src/contract.rs" <<'RS'
-use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, StdResult};
+    cat > "$target/src/msg.rs" <<'RS'
+use cosmwasm_schema::{cw_serde, QueryResponses};
 
-pub fn instantiate(_deps: DepsMut, _env: Env, _info: MessageInfo) -> StdResult<Response> {
-    Ok(Response::new())
+#[cw_serde]
+pub struct InstantiateMsg {}
+
+#[cw_serde]
+pub enum ExecuteMsg {}
+
+#[cw_serde]
+#[derive(QueryResponses)]
+pub enum QueryMsg {}
+RS
+    cat > "$target/src/state.rs" <<'RS'
+use cosmwasm_schema::cw_serde;
+use cw_storage_plus::Item;
+
+#[cw_serde]
+pub struct Config {}
+
+pub const CONFIG: Item<Config> = Item::new("config");
+RS
+    cat > "$target/src/error.rs" <<'RS'
+use cosmwasm_std::StdError;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum ContractError {
+    #[error("{0}")]
+    Std(#[from] StdError),
+
+    #[error("Unauthorized")]
+    Unauthorized {},
 }
 RS
-    touch "$target/src/error.rs" "$target/src/msg.rs" "$target/src/state.rs"
+    cat > "$target/src/contract.rs" <<'RS'
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
+use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use crate::error::ContractError;
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn instantiate(
+    _deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    _msg: InstantiateMsg,
+) -> Result<Response, ContractError> {
+    Ok(Response::new())
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn execute(
+    _deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    _msg: ExecuteMsg,
+) -> Result<Response, ContractError> {
+    Ok(Response::new())
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn query(_deps: Deps, _env: Env, _msg: QueryMsg) -> StdResult<Binary> {
+    Err(cosmwasm_std::StdError::generic_err("Not implemented"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
+    use cosmwasm_std::Addr;
+
+    #[test]
+    fn proper_initialization() {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = message_info(&Addr::unchecked("creator"), &[]);
+        let msg = InstantiateMsg {};
+
+        let res = instantiate(deps.as_mut(), env, info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+    }
+}
+RS
     ;;
   evm)
     mkdir -p "$target/src" "$target/script" "$target/lib" "$target/test"
