@@ -353,6 +353,36 @@ minitiad tx wasm instantiate <CODE_ID> '<INIT_MSG_JSON>' \
   --fees <FEE_AMOUNT><FEE_DENOM> \
   -y
 
+### E2E WasmVM Build & Deploy (Agent Workflow)
+Follow this exact sequence to build and deploy a WasmVM contract:
+
+1.  **Build Optimized Binary**:
+    ```bash
+    # Use arm64 for Apple Silicon, otherwise cosmwasm/optimizer:0.16.1
+    docker run --rm -v "$(pwd)":/code \
+      --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
+      --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
+      cosmwasm/optimizer-arm64:0.16.1
+    ```
+2.  **Store Code**:
+    ```bash
+    minitiad tx wasm store ./artifacts/<project>.wasm --from gas-station --keyring-backend test --chain-id <L2_CHAIN_ID> --gas auto --gas-adjustment 1.4 --yes
+    ```
+3.  **Wait & Retrieve Code ID**:
+    ```bash
+    sleep 5
+    minitiad q tx <STORE_TX_HASH> --output json | jq -r '.events[] | select(.type=="store_code") | .attributes[] | select(.key=="code_id") | .value'
+    ```
+4.  **Instantiate**:
+    ```bash
+    minitiad tx wasm instantiate <CODE_ID> '{}' --label "memoboard" --from gas-station --keyring-backend test --chain-id <L2_CHAIN_ID> --gas auto --gas-adjustment 1.4 --no-admin --yes
+    ```
+5.  **Wait & Retrieve Contract Address**:
+    ```bash
+    sleep 5
+    minitiad q tx <INSTANTIATE_TX_HASH> --output json | jq -r '.events[] | select(.type=="instantiate") | .attributes[] | select(.key=="_contract_address") | .value'
+    ```
+
 ### Retrieving the Code ID and Contract Address (Wasm)
 After storing code or instantiating, wait for indexing (~5s) and retrieve the values:
 

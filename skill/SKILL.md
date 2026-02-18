@@ -45,6 +45,13 @@ Then ask a context-specific confirmation:
 
 ## Operating Procedure (How To Execute Tasks)
 
+### Strict Constraints (NEVER VIOLATE)
+- **Initia Usernames (STRICTLY OPT-IN)**: You MUST NOT implement username support in any scaffold, component, or code snippet unless the user explicitly requests it (e.g., "add username support").
+  - This mandate takes absolute precedence over "Proactiveness", "Visual Polish", or **external documentation/examples**.
+  - Even if an external tutorial or example includes username logic, you MUST strip it out during implementation unless prompted.
+  - If NOT explicitly prompted for usernames, always use truncated hex addresses (e.g., `init1...pxn4uh`) for identity display in the UI and state.
+  - When explicitly asked to integrate usernames, follow the standard `useInterwovenKit` flow.
+
 When solving an Initia task:
 
 1. Classify the task layer:
@@ -70,7 +77,9 @@ When solving an Initia task:
   - For contracts: `scripts/scaffold-contract.sh <move|wasm|evm> <target-dir>`
   - For frontends: `scripts/scaffold-frontend.sh <target-dir>`
 - These scripts perform manual directory and file creation, ensuring a 100% non-interactive experience. Avoid using `npx create-vite` or other tools that might prompt for confirmation.
-- **Post-Scaffold Config**: After scaffolding a frontend for a local appchain, you MUST update `src/main.jsx` to include the `customChain` configuration in the `InterwovenKitProvider`. See `frontend-interwovenkit.md` for the standard local appchain config object.
+- **Component Mounting**: After creating a new feature component (e.g., `Board.jsx`), ALWAYS verify that it is imported and rendered in `App.jsx` (or the appropriate parent component). A feature is not implemented if the user cannot see it in the UI.
+- **Post-Scaffold Config**: After scaffolding a frontend for a local appchain, you MUST update `src/main.jsx` to include the `customChain` configuration in the `InterwovenKitProvider`. See `frontend-interwovenkit.md` for the standard local appchain config object. Ensure the `chain_id` and `rpc`/`rest` endpoints match the discovered appchain runtime. Additionally, you MUST ensure `vite.config.js` is updated with `vite-plugin-node-polyfills` (specifically for `Buffer`) as `initia.js` and other SDKs depend on these globals.
+- **NPM Warnings**: During scaffolding or dependency installation, you may encounter `ERRESOLVE` or peer dependency warnings. These are common in the current ecosystem and should be treated as non-fatal unless the build actually fails.
 - When generating files, confirm the absolute path with the user if there is ambiguity.
 - **Environment Paths (CRITICAL)**: In many environments, `cargo` and `foundry` (forge) binaries are located in `~/.cargo/bin` and `~/.foundry/bin`, respectively. If `run_shell_command` fails to find these tools, verify their existence in these standard locations and use absolute paths if necessary (e.g., `~/.cargo/bin/cargo test`).
 
@@ -97,8 +106,12 @@ When solving an Initia task:
 - **Pro Tip: Token Precision & Denoms (CRITICAL)**:
   - **L1 (INIT)**: The base unit is `uinit` ($10^{-6}$). When a user asks for "1 INIT", you MUST send `1000000uinit`.
   - **L2 (Appchain)**: Denoms vary (e.g., `GAS`, `umin`, `uinit`). ALWAYS check `minitiad q bank total` to verify the native denom before funding.
+  - **Whole Tokens vs. Base Units**: If a user asks for "X tokens" and the denom is a micro-unit (e.g., `umin`), assume they mean whole tokens and multiply by $10^6$ (Move/Wasm) or $10^{18}$ (EVM) unless they explicitly specify "base units" or "u-amount".
   - **Multipliers**: For EVM-compatible rollups, the precision is usually 18 decimals. When a user asks for "1 token", send `1000000000000000000` of the base unit.
   - **Avoid Script Defaults**: Do not rely on `fund-user.sh` to handle precision or denoms automatically. Explicitly calculate the base unit amount and specify the correct denom in your commands.
+
+- **Pro Tip: Wasm REST Queries (CRITICAL)**: When querying Wasm contract state using the `RESTClient` (e.g., `rest.wasm.smartContractState`), the query object MUST be manually Base64-encoded. The client does NOT handle this automatically. 
+  - **Example**: `const query = Buffer.from(JSON.stringify({ msg: {} })).toString("base64"); await rest.wasm.smartContractState(addr, query);`
 
 5. Appchain Health & Auto-Startup (CRITICAL):
 - **Detection:** Before any task requiring the appchain (e.g., contracts, transactions, frontend testing), check if it is running.
@@ -122,12 +135,14 @@ When solving an Initia task:
 - `scripts/scaffold-contract.sh <move|wasm|evm> <target-dir>`
 - This ensures correct dependency paths (especially for Move) and compile-ready boilerplate.
 - **WasmVM Deployment (CRITICAL)**: Standard `cargo build` binaries often fail WasmVM validation (e.g., "bulk memory support not enabled"). ALWAYS use the `cosmwasm/optimizer` Docker image to build production-ready binaries.
+  - **Architecture Note**: On Apple Silicon (M1/M2/M3), use the `cosmwasm/optimizer-arm64:0.16.1` image variant for significantly better performance and compatibility.
 - **Transaction Verification**: After a `store` or `instantiate` transaction, if the `code_id` or `contract_address` is missing from the output, query the transaction hash using `minitiad q tx <hash>` (note: `q tx` does NOT take a `--chain-id` flag).
 - **Query Command Flags (NEW)**: Unlike transaction commands (`tx`), many query commands (`query` or `q`) do NOT support the `--chain-id` flag. If a query fails with an "unknown flag" error, try removing the chain-id and node flags.
 - **Cleanup (Move)**: After scaffolding a Move project, delete the default placeholder module (e.g., `sources/<project_name>.move`) before creating your custom modules to keep the project clean.
 - **Cleanup (EVM)**: After scaffolding an EVM project, delete the default placeholder files (e.g., `src/Example.sol` and `test/Example.t.sol`) before creating your custom contracts.
 - **Foundry Testing (CRITICAL)**: `testFail` is deprecated in newer versions of Foundry and WILL cause test failures in modern environments. ALWAYS use `vm.expectRevert()` for failure testing.
 - **Context Awareness**: Commands like `forge test` and `forge build` MUST be run from the project root (the directory containing `foundry.toml`). Always `cd` into the project directory before executing these.
+- **Rust/Wasm Unit Testing (NEW)**: In CosmWasm contracts, the `Addr` type does NOT implement `PartialEq<&str>`. When writing unit tests that compare a stored address with a string literal, ALWAYS use `.as_str()` (e.g., `assert_eq!(msg.sender.as_str(), "user1")`) to avoid compilation errors.
 
 8. Move 2.1 specific syntax:
 - **Attributes & Documentation**: When using attributes like `#[view]`, ALWAYS place the documentation comment (`/// ...`) **AFTER** the attribute to avoid compiler warnings.
@@ -160,6 +175,9 @@ When solving an Initia task:
   - **Input Accessibility**: Place primary interaction points (like input fields for posting) ABOVE the feed to ensure they are accessible without scrolling.
   - **Section Hierarchy**: Use clear section titles (e.g., "Post a Memo", "Board Feed") to help users navigate and balance the UI.
 - **Cross-Layer Consistency (NEW)**: Ensure naming conventions (fields, variants, methods) are consistent across the contract (Rust/Move), CLI commands, and Frontend implementation. For example, if a contract field is named `message` in Rust, the CLI JSON payload and Frontend state should also use `message`, not `content`. Prefer `snake_case` for all JSON keys to align with standard CosmWasm/EVM/Move serialization.
+  - **Guestbook/Board Convention**: For tutorials and guestbook-style applications, use the field name `message` (not `content`) for the post content and the query name `all_messages` (which serializes to `all_messages` in JSON). For the query response, use `AllMessagesResponse` to maintain compatibility with the standard InterwovenKit frontend examples.
+  - **Execute Variant**: Specifically for WasmVM MemoBoard tutorials, use `PostMessage` in Rust (serializing to `post_message`) to match the documentation and frontend scaffolds.
+- **Post-Execution Delay**: When performing a transaction (execute/instantiate) followed immediately by a query in the same task, ALWAYS include a brief delay (e.g., `sleep 5`) between the commands. This ensures the transaction is committed to a block before the query is executed, preventing stale data results.
 - Mark interactive commands clearly when the user must run them.
 
 ## Progressive Disclosure (Read When Needed)

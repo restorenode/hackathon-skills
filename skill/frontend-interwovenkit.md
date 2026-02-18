@@ -193,19 +193,21 @@ Important behavior:
 
 ## Wallet Button Pattern
 
+> **Compliance Note**: Per the "Initia Usernames" mandate, you MUST NOT include `username` in this component unless explicitly requested. Always default to truncated hex/bech32 addresses.
+
 ```tsx
 import { useInterwovenKit } from "@initia/interwovenkit-react";
 
 function shortenAddress(value: string) {
   if (value.length < 14) return value;
-  return `${value.slice(0, 8)}...${value.slice(-6)}`;
+  return `${value.slice(0, 8)}...${value.slice(-4)}`;
 }
 
 export function WalletButton() {
-  const { initiaAddress, username, openWallet, openConnect } = useInterwovenKit();
+  const { initiaAddress, openWallet, openConnect } = useInterwovenKit();
 
   if (!initiaAddress) return <button onClick={openConnect} className="btn">Connect</button>;
-  return <button onClick={openWallet} className="btn">{username ?? shortenAddress(initiaAddress)}</button>;
+  return <button onClick={openWallet} className="btn">{shortenAddress(initiaAddress)}</button>;
 }
 ```
 
@@ -401,9 +403,9 @@ export function getHexAddress(address: string) {
   - **Fix**: Use `new TextEncoder().encode(JSON.stringify(msg))` for the `msg` field.
 
 - **Buffer is not defined**: Initia.js uses Node.js globals. Use `vite-plugin-node-polyfills` or manual global assignment.
-- **Chain not found**: Ensure `customChain` is passed to `InterwovenKitProvider` and `defaultChainId` matches.
+- **Chain not found**: Ensure `customChain` is passed to `InterwovenKitProvider` (singular prop for a single chain) and `defaultChainId` matches.
 - **URL not found**: Ensure `rpc`, `rest`, AND `indexer` are present in `customChain.apis`.
-- **LCDClient is not an export**: Use `RESTClient` instead.
+- **LCDClient or useRest is not an export**: These hooks are not currently exported in `@initia/interwovenkit-react` v2.4.0. Use `RESTClient` from `@initia/initia.js` instead.
 - **View function 400/500 errors**: Ensure arguments are correctly typed strings (e.g., `address:init1...`) and parameters match Move signature exactly. Prefer `resource()` queries for simple state.
 - **Unstyled Modal**: Ensure `styles.css` is imported AND `injectStyles(InterwovenKitStyles)` is called in `main.jsx`.
 

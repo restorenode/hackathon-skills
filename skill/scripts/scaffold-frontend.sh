@@ -53,6 +53,24 @@ export default defineConfig({
 })
 EOF
 
+# Create index.css
+cat > src/index.css <<EOF
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #fafafa;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+EOF
+
 # Create index.html
 cat > index.html <<EOF
 <!DOCTYPE html>
@@ -85,6 +103,7 @@ import { WagmiProvider, createConfig, http } from "wagmi";
 import { mainnet } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from './App.jsx'
+import './index.css'
 
 // Inject styles for the widget
 injectStyles(InterwovenKitStyles);
@@ -95,11 +114,42 @@ const wagmiConfig = createConfig({
   transports: { [mainnet.id]: http() },
 });
 
+/* 
+// Example: Custom Appchain Configuration
+// Replace placeholders with values from 'minitia.config.json' or 'scripts/verify-appchain.sh'
+const customChain = {
+  chain_id: 'your-appchain-id',
+  chain_name: 'your-appchain',
+  pretty_name: 'My Appchain',
+  network_type: 'testnet',
+  bech32_prefix: 'init',
+  logo_URIs: {
+    png: 'https://raw.githubusercontent.com/initia-labs/initia-registry/main/testnets/initia/images/initia.png',
+    svg: 'https://raw.githubusercontent.com/initia-labs/initia-registry/main/testnets/initia/images/initia.svg',
+  },
+  apis: {
+    rpc: [{ address: 'http://localhost:26657' }],
+    rest: [{ address: 'http://localhost:1317' }],
+    indexer: [{ address: 'http://localhost:8080' }],
+  },
+  fees: {
+    fee_tokens: [{ denom: 'umin', fixed_min_gas_price: 0 }],
+  },
+  metadata: {
+    minitia: { type: 'miniwasm' }, // Use 'minievm' or 'minimove' if applicable
+  },
+}
+*/
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <InterwovenKitProvider {...TESTNET}>
+        <InterwovenKitProvider 
+          {...TESTNET}
+          /* defaultChainId="your-appchain-id" */
+          /* customChain={customChain} */
+        >
           <App />
         </InterwovenKitProvider>
       </QueryClientProvider>
@@ -116,6 +166,11 @@ import { useInterwovenKit } from "@initia/interwovenkit-react";
 function App() {
   const { initiaAddress, openConnect, openWallet } = useInterwovenKit();
 
+  const shortenAddress = (addr) => {
+    if (!addr) return "";
+    return \`\${addr.slice(0, 8)}...\${addr.slice(-4)}\`;
+  };
+
   const containerStyle = {
     fontFamily: '"Inter", system-ui, -apple-system, sans-serif',
     minHeight: '100vh',
@@ -130,25 +185,27 @@ function App() {
 
   const cardStyle = {
     backgroundColor: '#ffffff',
-    borderRadius: '16px',
-    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-    padding: '40px',
+    borderRadius: '24px',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+    padding: '48px',
     width: '100%',
     maxWidth: '480px',
-    textAlign: 'center'
+    textAlign: 'center',
+    border: '1px solid #f1f5f9'
   };
 
   const buttonStyle = {
     backgroundColor: '#3b82f6',
     color: 'white',
     border: 'none',
-    padding: '12px 24px',
-    borderRadius: '8px',
+    padding: '14px 28px',
+    borderRadius: '12px',
     fontSize: '16px',
-    fontWeight: '600',
+    fontWeight: '700',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
-    boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.5)'
+    boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.5)',
+    width: '100%'
   };
 
   const secondaryButtonStyle = {
@@ -156,27 +213,35 @@ function App() {
     backgroundColor: '#f1f5f9',
     color: '#475569',
     boxShadow: 'none',
-    marginTop: '10px'
+    marginTop: '12px'
   };
 
   const addressBadgeStyle = {
-    backgroundColor: '#f1f5f9',
-    padding: '8px 12px',
-    borderRadius: '6px',
+    backgroundColor: '#f8fafc',
+    padding: '12px',
+    borderRadius: '12px',
     fontSize: '14px',
     fontFamily: 'monospace',
+    fontWeight: '600',
     color: '#64748b',
-    marginBottom: '20px',
-    wordBreak: 'break-all'
+    marginBottom: '24px',
+    border: '1px solid #e2e8f0'
   };
 
   return (
     <div style={containerStyle}>
       <div style={cardStyle}>
-        <h1 style={{ fontSize: '32px', marginBottom: '8px', fontWeight: '800', color: '#0f172a' }}>
+        <h1 style={{ 
+          fontSize: '40px', 
+          marginBottom: '12px', 
+          fontWeight: '900', 
+          color: '#0f172a',
+          letterSpacing: '-1px',
+          textTransform: 'uppercase'
+        }}>
           $pkg_name
         </h1>
-        <p style={{ color: '#64748b', marginBottom: '32px' }}>
+        <p style={{ color: '#64748b', marginBottom: '40px', fontSize: '16px', lineHeight: '1.5' }}>
           Welcome to your new Initia appchain frontend!
         </p>
         
@@ -191,7 +256,7 @@ function App() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div style={addressBadgeStyle}>{initiaAddress}</div>
+            <div style={addressBadgeStyle}>{shortenAddress(initiaAddress)}</div>
             <button 
               onClick={openWallet} 
               style={secondaryButtonStyle}
