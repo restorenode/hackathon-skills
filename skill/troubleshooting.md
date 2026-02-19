@@ -133,7 +133,7 @@ npm install
 
 ## Contracts
 
-### 9. Build/import errors from wrong VM assumptions
+### 10. Build/import errors from wrong VM assumptions
 
 Checks:
 - Confirm VM target first (`evm`, `move`, `wasm`).
@@ -152,7 +152,7 @@ scripts/scaffold-contract.sh <evm|move|wasm> <target-dir>
 
 ## Configuration
 
-### 10. Common CLI Errors
+### 11. Common CLI Errors
 
 | Error | Cause | Fix |
 |---|---|---|
@@ -162,14 +162,14 @@ scripts/scaffold-contract.sh <evm|move|wasm> <target-dir>
 | `invalid denom` or `insufficient funds` | Using incorrect token precision (e.g., 100 vs 10^20). | Query total supply: `minitiad q bank total`. Most L2 tokens (like `umin`) use 18 decimals. |
 | `failed to convert address field` | Using a Bech32 address (`init1...`) where a key name is expected. | Use the key name (e.g., `gas-station`) or ensure the address is in the local keyring. |
 
-### 11. Network & Chain ID Discovery
+### 12. Network & Chain ID Discovery
 
 If you are unsure of the correct `chain-id` for a layer:
 
 - **L1 (Initia Testnet)**: `initiad status --node https://rpc.testnet.initia.xyz \| jq -r '.NodeInfo.network'` (usually `initiation-2`).
 - **L2 (Local Appchain)**: `minitiad status \| jq -r '.NodeInfo.network'` (usually `social-1`).
 
-### 12. Launch config rejected by Weave
+### 13. Launch config rejected by Weave
 
 Checks:
 - Field names are snake_case.

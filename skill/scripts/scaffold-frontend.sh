@@ -114,12 +114,11 @@ const wagmiConfig = createConfig({
   transports: { [mainnet.id]: http() },
 });
 
-/* 
-// Example: Custom Appchain Configuration
-// Replace placeholders with values from 'minitia.config.json' or 'scripts/verify-appchain.sh'
+// Custom Appchain Configuration
+// This is REQUIRED for local rollups to be recognized by InterwovenKit.
 const customChain = {
-  chain_id: 'your-appchain-id',
-  chain_name: 'your-appchain',
+  chain_id: 'your-appchain-id', // Update to match your rollup
+  chain_name: 'myapp',
   pretty_name: 'My Appchain',
   network_type: 'testnet',
   bech32_prefix: 'init',
@@ -131,15 +130,18 @@ const customChain = {
     rpc: [{ address: 'http://localhost:26657' }],
     rest: [{ address: 'http://localhost:1317' }],
     indexer: [{ address: 'http://localhost:8080' }],
+    // "json-rpc": [{ address: 'http://localhost:8545' }], // REQUIRED for EVM rollups
   },
   fees: {
     fee_tokens: [{ denom: 'umin', fixed_min_gas_price: 0 }],
   },
   metadata: {
-    minitia: { type: 'miniwasm' }, // Use 'minievm' or 'minimove' if applicable
+    is_l1: false,
+    minitia: { 
+      type: 'minimove', // Use 'minimove', 'miniwasm', or 'minievm'
+    },
   },
 }
-*/
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -147,8 +149,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <QueryClientProvider client={queryClient}>
         <InterwovenKitProvider 
           {...TESTNET}
-          /* defaultChainId="your-appchain-id" */
-          /* customChain={customChain} */
+          defaultChainId="your-appchain-id" // Update to match your rollup
+          customChain={customChain}
         >
           <App />
         </InterwovenKitProvider>
@@ -177,95 +179,107 @@ function App() {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#f8fafc',
     color: '#1e293b',
     padding: '20px'
   };
 
-  const cardStyle = {
-    backgroundColor: '#ffffff',
-    borderRadius: '24px',
-    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-    padding: '48px',
+  const headerStyle = {
     width: '100%',
-    maxWidth: '480px',
-    textAlign: 'center',
-    border: '1px solid #f1f5f9'
+    maxWidth: '800px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '20px 0',
+    marginBottom: '40px',
+    borderBottom: '1px solid #e2e8f0'
   };
 
-  const buttonStyle = {
+  const pillButtonStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    border: '1px solid #e2e8f0',
+    padding: '6px 16px',
+    borderRadius: '100px',
+    cursor: 'pointer',
+    fontWeight: '600',
+    fontSize: '14px',
+    color: '#0f172a',
+    transition: 'all 0.2s ease',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+  };
+
+  const connectButtonStyle = {
     backgroundColor: '#3b82f6',
     color: 'white',
     border: 'none',
-    padding: '14px 28px',
-    borderRadius: '12px',
-    fontSize: '16px',
+    padding: '10px 24px',
+    borderRadius: '100px',
+    fontSize: '14px',
     fontWeight: '700',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
-    boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.5)',
-    width: '100%'
-  };
-
-  const secondaryButtonStyle = {
-    ...buttonStyle,
-    backgroundColor: '#f1f5f9',
-    color: '#475569',
-    boxShadow: 'none',
-    marginTop: '12px'
-  };
-
-  const addressBadgeStyle = {
-    backgroundColor: '#f8fafc',
-    padding: '12px',
-    borderRadius: '12px',
-    fontSize: '14px',
-    fontFamily: 'monospace',
-    fontWeight: '600',
-    color: '#64748b',
-    marginBottom: '24px',
-    border: '1px solid #e2e8f0'
+    boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)'
   };
 
   return (
     <div style={containerStyle}>
-      <div style={cardStyle}>
+      <header style={headerStyle}>
         <h1 style={{ 
-          fontSize: '40px', 
-          marginBottom: '12px', 
+          margin: 0, 
+          fontSize: '20px', 
           fontWeight: '900', 
+          letterSpacing: '-0.5px',
           color: '#0f172a',
-          letterSpacing: '-1px',
           textTransform: 'uppercase'
         }}>
           $pkg_name
         </h1>
-        <p style={{ color: '#64748b', marginBottom: '40px', fontSize: '16px', lineHeight: '1.5' }}>
-          Welcome to your new Initia appchain frontend!
-        </p>
         
-        {!initiaAddress ? (
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <div>
+          {!initiaAddress ? (
             <button 
               onClick={openConnect} 
-              style={buttonStyle}
+              style={connectButtonStyle}
             >
               Connect Wallet
             </button>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div style={addressBadgeStyle}>{shortenAddress(initiaAddress)}</div>
+          ) : (
             <button 
               onClick={openWallet} 
-              style={secondaryButtonStyle}
+              style={pillButtonStyle}
             >
-              Open Wallet
+              <span style={{
+                width: '8px',
+                height: '8px',
+                backgroundColor: '#10b981',
+                borderRadius: '50%',
+                marginRight: '10px'
+              }}></span>
+              {shortenAddress(initiaAddress)}
             </button>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </header>
+
+      <main style={{ 
+        width: '100%', 
+        maxWidth: '800px',
+        backgroundColor: '#ffffff',
+        borderRadius: '24px',
+        padding: '40px',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+        border: '1px solid #f1f5f9',
+        textAlign: 'center'
+      }}>
+        <h2 style={{ fontSize: '24px', marginBottom: '16px', color: '#0f172a' }}>
+          Welcome to your new Initia appchain frontend!
+        </h2>
+        <p style={{ color: '#64748b', fontSize: '16px', lineHeight: '1.5' }}>
+          Your frontend is now connected to your local appchain. Start building your next great idea!
+        </p>
+      </main>
     </div>
   )
 }

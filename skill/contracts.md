@@ -18,9 +18,8 @@ Ask for missing inputs before generating contract code:
 
 1. Which VM (`evm`, `move`, `wasm`)?
 2. Is this new contract scaffolding or edits to existing code?
-3. Is oracle integration required?
-4. Which network and chain IDs are targeted?
-5. Which deployment toolchain is expected (Foundry, Move CLI, CosmWasm workflow)?
+3. Which network and chain IDs are targeted?
+4. Which deployment toolchain is expected (Foundry, Move CLI, CosmWasm workflow)?
 
 ## Opinionated Defaults
 
@@ -29,7 +28,7 @@ Ask for missing inputs before generating contract code:
 | VM | `evm` | Use `move`/`wasm` only when requested |
 | EVM toolchain | Foundry | Keep `solc` pinned |
 | Move dependency | `InitiaStdlib` | Use official repo path |
-| Wasm baseline | `cosmwasm-std` + `cw-storage-plus` | Add oracle libs only when needed |
+| Wasm baseline | `cosmwasm-std` + `cw-storage-plus` | Add deps only when needed |
 
 ## Toolchain Prerequisites
 
@@ -76,7 +75,7 @@ initiad config view
 1. Confirm VM and select matching section below.
 2. Produce a minimal compile-ready starter first (`scripts/scaffold-contract.sh <evm|move|wasm> <target-dir>`).
 3. **Cleanup**: Scaffolding creates a boilerplate file (e.g., `sources/<project_name>.move`). Delete or rename this if you are creating a different module.
-4. Add feature-specific logic (oracle, execute paths, storage).
+4. Add feature-specific logic (execute paths, storage).
 5. Add placeholders for chain/module-specific values.
 6. Provide explicit build/deploy commands for the selected VM.
 
@@ -281,22 +280,6 @@ serde = { version = "1.0.197", default-features = false, features = ["derive"] }
 thiserror = "1.0.58"
 ```
 
-### Oracle Query Pattern
-
-```rust
-use cosmwasm_std::{to_json_binary, Binary, Deps, QueryRequest, StdResult, WasmQuery};
-
-pub fn query_price_raw(deps: Deps, oracle_addr: String) -> StdResult<Binary> {
-    deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr: oracle_addr,
-        msg: to_json_binary(&slinky_wasm::oracle::QueryMsg::GetPrice {
-            base: "BTC".to_string(),
-            quote: "USD".to_string(),
-        })?,
-    }))
-}
-```
-
 ### Build and Deploy (Wasm)
 
 **AI Strategy: Command Paths**
@@ -333,80 +316,40 @@ rmp = "=0.8.14"
 rmp-serde = "=1.3.0"
 ```
 
-# Upload/store code (using the default gas-station account)
-minitiad tx wasm store <PATH_TO_WASM> \
-  --from gas-station \
-  --keyring-backend test \
-  --gas auto \
-  --gas-adjustment 1.4 \
-  --fees <FEE_AMOUNT><FEE_DENOM> \
-  -y
-
-# Instantiate contract
-minitiad tx wasm instantiate <CODE_ID> '<INIT_MSG_JSON>' \
-  --label <LABEL> \
-  --admin $(minitiad keys show gas-station -a --keyring-backend test) \
-  --from gas-station \
-  --keyring-backend test \
-  --gas auto \
-  --gas-adjustment 1.4 \
-  --fees <FEE_AMOUNT><FEE_DENOM> \
-  -y
-
 ### E2E WasmVM Build & Deploy (Agent Workflow)
 Follow this exact sequence to build and deploy a WasmVM contract:
 
-1.  **Build Optimized Binary**:
-    ```bash
-    # Use arm64 for Apple Silicon, otherwise cosmwasm/optimizer:0.16.1
-    docker run --rm -v "$(pwd)":/code \
-      --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
-      --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-      cosmwasm/optimizer-arm64:0.16.1
-    ```
-2.  **Store Code**:
+1.  **Store Code**:
     ```bash
     minitiad tx wasm store ./artifacts/<project>.wasm --from gas-station --keyring-backend test --chain-id <L2_CHAIN_ID> --gas auto --gas-adjustment 1.4 --yes
     ```
-3.  **Wait & Retrieve Code ID**:
+2.  **Wait & Retrieve Code ID**:
     ```bash
     sleep 5
     minitiad q tx <STORE_TX_HASH> --output json | jq -r '.events[] | select(.type=="store_code") | .attributes[] | select(.key=="code_id") | .value'
     ```
-4.  **Instantiate**:
+3.  **Instantiate**:
     ```bash
     minitiad tx wasm instantiate <CODE_ID> '{}' --label "memoboard" --from gas-station --keyring-backend test --chain-id <L2_CHAIN_ID> --gas auto --gas-adjustment 1.4 --no-admin --yes
     ```
-5.  **Wait & Retrieve Contract Address**:
+4.  **Wait & Retrieve Contract Address**:
     ```bash
     sleep 5
     minitiad q tx <INSTANTIATE_TX_HASH> --output json | jq -r '.events[] | select(.type=="instantiate") | .attributes[] | select(.key=="_contract_address") | .value'
     ```
-
-### Retrieving the Code ID and Contract Address (Wasm)
-After storing code or instantiating, wait for indexing (~5s) and retrieve the values:
-
-```bash
-# Get Code ID
-minitiad q tx <TX_HASH> --output json | jq -r '.events[] | select(.type=="store_code") | .attributes[] | select(.key=="code_id") | .value'
-
-# Get Contract Address
-minitiad q tx <TX_HASH> --output json | jq -r '.events[] | select(.type=="instantiate") | .attributes[] | select(.key=="_contract_address") | .value'
-```
 
 ### Execute and Query (Wasm CLI)
 
 ```bash
 # Execute a contract call (State-changing)
 minitiad tx wasm execute <CONTRACT_ADDRESS> '<MSG_JSON>' \
-  --from gas-station \
-  --keyring-backend test \
-  --chain-id <CHAIN_ID> \
+  --from gas-station --keyring-backend test --chain-id <CHAIN_ID> \
   --gas auto --gas-adjustment 1.4 --yes
 
 # Query contract state (Read-only)
 minitiad query wasm contract-state smart <CONTRACT_ADDRESS> '<QUERY_JSON>'
 ```
+
 ```
 
 ## EVM (Solidity)
@@ -424,34 +367,12 @@ minitiad query wasm contract-state smart <CONTRACT_ADDRESS> '<QUERY_JSON>'
 ```
 
 Conventions:
-- Contract filenames use PascalCase (example: `OracleConsumer.sol`)
+- Contract filenames use PascalCase (example: `MyContract.sol`)
 - Deploy script at `script/Deploy.s.sol`
-
-### Oracle Example
-
-```solidity
-pragma solidity ^0.8.24;
-
-import "initia-evm-contracts/src/interfaces/ISlinky.sol";
-
-contract OracleConsumer {
-    ISlinky public immutable slinky;
-
-    constructor(address slinkyAddress) {
-        slinky = ISlinky(slinkyAddress);
-    }
-
-    function oracleGetPrice() external view returns (uint256 price) {
-        string memory base = "BTC";
-        string memory quote = "USD";
-        price = slinky.get_price(base, quote);
-    }
-}
-```
 
 ### Build and Deploy (EVM)
 
-> **Note:** For EVM deployment, you can use Foundry (recommended) or the `minitiad` CLI for raw bytecode.
+> **CRITICAL (Security):** To protect key material, you MUST prioritize the `minitiad` CLI for deployment as it uses the secure local keyring. Avoid `forge create` or `forge script` in automated workflows as they require raw private keys.
 
 #### Pro Tip: EVM Unit Testing with `msg.sender`
 If your Solidity contract uses `msg.sender` in a `view` function (e.g., `mapping(address => uint256) balances; ... return balances[msg.sender];`), remember that in Foundry tests:
@@ -472,20 +393,7 @@ vm.expectRevert("Insufficient balance");
 bank.withdraw(2 ether);
 ```
 
-#### Option 1: Foundry (Recommended)
-
-```bash
-# Build
-forge build
-
-# Deploy (using gas-station private key)
-forge script script/Deploy.s.sol:Deploy \
-  --rpc-url <EVM_RPC_URL> \
-  --private-key <GAS_STATION_PRIVATE_KEY> \
-  --broadcast
-```
-
-#### Option 2: Minitiad CLI (Raw Bytecode)
+#### Option 1: Minitiad CLI (Recommended for Security)
 
 > **Pro Tip**: The `minitiad tx evm create` command expects a **raw hex string** (or a file containing one). It will fail if you pass the full Foundry JSON artifact (e.g., `out/MyContract.json`). Always extract the bytecode first.
 
@@ -494,14 +402,18 @@ forge script script/Deploy.s.sol:Deploy \
 forge build
 
 # 2. Extract hex bytecode (requires jq)
+# Use sed to remove 0x prefix and tr to remove newlines
 jq -r '.bytecode.object' out/MyContract.sol/MyContract.json | sed 's/^0x//' | tr -d '\n' > MyContract.bin
 
-# 3. Deploy the binary
+# 3. Deploy the binary securely via keyring
 minitiad tx evm create MyContract.bin \
   --from gas-station \
   --keyring-backend test \
   --chain-id <CHAIN_ID> \
-  --gas auto --gas-adjustment 1.4 --yes
+  --gas-prices 0.15GAS \
+  --gas 3000000 \
+  -y
+```
 
 ### Retrieving the Contract Address
 The `create` command returns a transaction hash but not the contract address. To find the address, wait for the transaction to be indexed:
@@ -510,9 +422,16 @@ sleep 5
 minitiad q tx <TX_HASH> --output json | jq -r '.events[] | select(.type=="contract_created") | .attributes[] | select(.key=="contract") | .value'
 ```
 
+#### Option 2: Foundry (Manual/Local only)
 
-# Example with constructor arguments (hex encoded)
-# minitiad tx evm create MyContract.bin --input 010203... --from gas-station ...
+Use only when the user explicitly provides a private key or for local development where security is not a concern.
+
+```bash
+# Deploy (using gas-station private key)
+forge script script/Deploy.s.sol:Deploy \
+  --rpc-url <EVM_RPC_URL> \
+  --private-key <PRIVATE_KEY> \
+  --broadcast
 ```
 
 ### Handling Token Precision
@@ -593,20 +512,15 @@ For any deploy flow, return:
 - **Move: Backward Incompatible Update**: If you see `BACKWARD_INCOMPATIBLE_MODULE_UPDATE`, you are trying to publish a module to an account that already has it, but your new code removes or changes existing public functions/structs.
   - **Fix**: The preferred fix is to **rename the module** (e.g., from `items` to `items_v2`) in the source code and `Move.toml`. This allows you to keep using the same account (like `gas-station`) without compatibility issues. Only use a fresh account if renaming is not an option for the project.
 
-- **Move Build Hangs (Automatic Fix)**: Building Move packages with git dependencies is slow. 
-  - **AI Strategy**: When starting a Move project, the AI should automatically set up a local `deps/` folder for the Initia framework to ensure fast builds. 
-  - **Action**: Use `scripts/scaffold-contract.sh move <dir>` as the primary path. If modifying an existing project, explain: *"I'm setting up a local `deps/` folder for the Initia framework to speed up your builds."* and then run:
-    `mkdir -p deps && cd deps && git clone --depth 1 https://github.com/initia-labs/movevm.git`
-    Then update `Move.toml` to use `local` paths for dependencies.
-
-- **Move Build Hangs (Manual Workaround)**: Clone the repository into a `deps/` folder at your project root with `--depth 1` and point to it using a `local` dependency in `Move.toml`:
+- **Move Build Hangs (AI Strategy)**: Building Move packages with git dependencies is extremely slow. 
+  - **Action**: ALWAYS use `scripts/scaffold-contract.sh move <dir>` which sets up a local `deps/` folder for the Initia framework to ensure fast builds. 
+  - **Manual Fix**: If modifying an existing project, clone the repository into a `deps/` folder at your project root and update `Move.toml` to use `local` paths:
     ```bash
     mkdir -p deps && cd deps
     git clone --depth 1 https://github.com/initia-labs/movevm.git
     ```
     ```toml
     [dependencies]
-    # Adjust relative path if your Move package is in a subdirectory (e.g., ../deps/...)
     InitiaStdlib = { local = "deps/movevm/precompile/modules/initia_stdlib" }
     ```
 

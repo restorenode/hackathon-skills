@@ -45,6 +45,7 @@ For pure EVM dApp frontend work (wallet + contract calls), default to `frontend-
 |---|---|---|
 | Frontend wallet stack | `@initia/interwovenkit-react` | Primary integration path |
 | Tx UX | `requestTxBlock` | Prefer explicit user confirmation |
+| Local Tx UX | `requestTxSync` | Use sync submission for better robustness in local dev |
 | Provider order | Wagmi -> Query -> InterwovenKit | Stable provider path |
 | Connector | `initiaPrivyWalletConnector` | Default connector in kit docs |
 | SDK path | InterwovenKit first | Use direct SDK only when required |
@@ -98,7 +99,7 @@ Avoid hard-coded version matrices in this skill.
 3. Set up `window.Buffer` and `window.process` in `main.jsx` before other imports.
 4. Set up providers in order: `WagmiProvider` -> `QueryClientProvider` -> `InterwovenKitProvider`.
 5. For custom appchains, provide a complete `customChain` object including `rpc`, `rest`, and a placeholder `indexer`.
-6. Use `RESTClient` (from `@initia/initia.js`) for querying resources or view functions.
+6. Use `RESTClient` (from `@initia/initia.js`) for querying resources or view functions. **Note: `LCDClient` is deprecated.**
 7. Prefer `rest.move.resource` for state queries as it is more robust than view functions.
 
 ## Provider Setup (Current Baseline)
@@ -141,7 +142,7 @@ const customChain = {
   apis: {
     rpc: [{ address: "http://localhost:26657" }],
     rest: [{ address: "http://localhost:1317" }],
-    indexer: [{ address: "http://localhost:8080" }],
+    indexer: [{ address: "http://localhost:8080" }], // Placeholder REQUIRED
     "json-rpc": [{ address: "http://localhost:8545" }] // REQUIRED for EVM appchains
   },
   fees: {
@@ -158,8 +159,22 @@ const customChain = {
   },
   metadata: {
     minitia: { type: "minievm" },
-    is_evm: true
-  }
+    is_l1: false
+  },
+  native_assets: [
+    {
+      denom: "GAS",
+      name: "Native Token",
+      symbol: "GAS",
+      decimals: 18
+    },
+    {
+      denom: "uinit",
+      name: "Initia",
+      symbol: "INIT",
+      decimals: 6
+    }
+  ]
 };
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -186,14 +201,17 @@ Important behavior:
 - `customChain` is the preferred property for a single local appchain.
 - `apis` MUST use the array-of-objects format: `rpc: [{ address: "..." }]`.
 - For `minievm` chains, you MUST include `"json-rpc"` in the `apis` object for internal balance and state queries to resolve.
+- `apis` MUST include `rpc`, `rest`, AND `indexer` (even if indexer is a placeholder).
+- `metadata` MUST include `is_l1: false` for appchains to be correctly registered in local environments.
 - `logo_URIs` and `staking` fields improve stability during chain discovery.
 - `defaultChainId` must match the `chain_id` you want active.
-- If omitted and chain is not in registry/profile sources, runtime can fail with `Chain not found: <CHAIN_ID>`.
-- `apis` MUST include `rpc`, `rest`, and `indexer` (even if indexer is a placeholder).
+- If omitted or incomplete, runtime can fail with `Chain not found: <CHAIN_ID>`.
 
-## Wallet Button Pattern
+## Wallet Button Pattern (Account Pill)
 
-> **Compliance Note**: Per the "Initia Usernames" mandate, you MUST NOT include `username` in this component unless explicitly requested. Always default to truncated hex/bech32 addresses.
+The "Account Pill" is the recommended pattern for wallet connectivity. It provides a clean, professional UI by showing the truncated address with a connectivity indicator, while delegating account management (and disconnecting) to the InterwovenKit Wallet Drawer.
+
+> **Compliance Note**: Per the "Initia Usernames" mandate, you MUST NOT include `username` in this component unless explicitly requested. If requested, use the pattern below.
 
 ```tsx
 import { useInterwovenKit } from "@initia/interwovenkit-react";
@@ -203,11 +221,69 @@ function shortenAddress(value: string) {
   return `${value.slice(0, 8)}...${value.slice(-4)}`;
 }
 
-export function WalletButton() {
-  const { initiaAddress, openWallet, openConnect } = useInterwovenKit();
+export function WalletPill() {
+  const { initiaAddress, username, openConnect, openWallet } = useInterwovenKit();
 
-  if (!initiaAddress) return <button onClick={openConnect} className="btn">Connect</button>;
-  return <button onClick={openWallet} className="btn">{shortenAddress(initiaAddress)}</button>;
+  // Standard username resolution pattern
+  const label = username ? username : shortenAddress(initiaAddress);
+
+  if (!initiaAddress) return (
+    <button onClick={openConnect} className="btn-connect">
+      Connect Wallet
+    </button>
+  );
+
+  return (
+    <button onClick={openWallet} className="account-pill">
+      <span className="status-dot"></span>
+      {label}
+    </button>
+  );
+}
+```
+
+**Recommended CSS (Vanilla):**
+```css
+.account-pill {
+  display: flex;
+  align-items: center;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  padding: 6px 16px;
+  borderRadius: 100px;
+  cursor: pointer;
+  fontWeight: 600;
+  fontSize: 14px;
+  transition: all 0.2s ease;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #10b981;
+  border-radius: 50%;
+  margin-right: 10px;
+}
+```
+
+## Standard Username Pattern
+
+When username support is requested for feeds or message boards, use the following pattern to display the connected user's identity while maintaining privacy for others.
+
+```tsx
+import { useInterwovenKit } from "@initia/interwovenkit-react";
+
+export function Message({ message }) {
+  const { initiaAddress, username } = useInterwovenKit();
+
+  return (
+    <div className="message">
+      <span className="sender">
+        {message.sender === initiaAddress && username ? username : shortenAddress(message.sender)}
+      </span>
+      <p>{message.text}</p>
+    </div>
+  );
 }
 ```
 
@@ -218,31 +294,43 @@ Use these patterns to satisfy the "beautiful and polished" mandate for centered 
 ### Centered Card & Balance Styles
 ```javascript
 const styles = {
-  container: {
-    padding: '40px',
-    width: '100%',
-    maxWidth: '520px',
-    margin: '40px auto',
-    textAlign: 'center',
-    borderRadius: '24px',
-    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
-    backgroundColor: '#ffffff',
-    fontFamily: 'system-ui, sans-serif'
-  },
-  balanceContainer: {
-    backgroundColor: '#f1f5f9',
-    padding: '30px',
-    borderRadius: '16px',
-    marginBottom: '30px',
-    border: '1px solid #e2e8f0'
-  },
-  balanceValue: {
-    fontSize: '42px',
-    fontWeight: '800',
-    color: '#2563eb',
-    fontFamily: 'monospace'
-  }
+  // ... (existing styles)
 };
+```
+
+### High-Fidelity Hero Layout (Vanilla CSS)
+
+Use this structure for a professional, centered landing page.
+
+**CSS (index.css):**
+```css
+.app-container { min-height: 100vh; display: flex; flex-direction: column; }
+.header { position: sticky; top: 0; z-index: 50; background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border-bottom: 1px solid #e2e8f0; padding: 1rem 1.5rem; }
+.main-content { max-width: 1100px; margin: 0 auto; padding: 4rem 1.5rem; width: 100%; flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center; }
+@media (max-width: 900px) { .main-content { grid-template-columns: 1fr; text-align: center; } }
+.hero-section h2 { font-size: 4rem; font-weight: 900; line-height: 1.1; letter-spacing: -0.04em; }
+.hero-accent { background: linear-gradient(to right, #2563eb, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.bank-card { background: white; border-radius: 32px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; overflow: hidden; width: 100%; max-width: 440px; margin: 0 auto; }
+```
+
+**JSX Structure:**
+```jsx
+<div className="app-container">
+  <header className="header">
+    <div className="header-content">
+      {/* Logo & Wallet Connect */}
+    </div>
+  </header>
+  <main className="main-content">
+    <div className="hero-section">
+      <h2>The Future of <span className="hero-accent">Savings</span> is Native.</h2>
+      <p className="hero-description">Experience ultra-low latency banking.</p>
+    </div>
+    <div className="app-section">
+      <Bank /> {/* Interaction Card */}
+    </div>
+  </main>
+</div>
 ```
 
 ## Transaction Patterns
@@ -272,7 +360,7 @@ export function useGameActions() {
       }),
     }];
 
-    return requestTxBlock({ messages });
+    return requestTxBlock({ msgs: messages });
   };
 
   return { mintShard };
@@ -302,17 +390,18 @@ export function useBankActions(contractAddress: string) {
     const messages = [{
       typeUrl: "/minievm.evm.v1.MsgCall", 
       value: {
-        sender: initiaAddress,
-        contractAddr: contractAddress, // Must be hex (0x...)
-        input: data.startsWith("0x") ? data : `0x${data}`, // Must have 0x prefix for simulation
+        sender: initiaAddress, // bech32
+        contractAddr: contractAddress, // hex (0x...)
+        input: data.startsWith("0x") ? data : `0x${data}`, 
         value: amount, // Amount in base units (string)
-        accessList: [],
+        accessList: [], // MANDATORY to avoid Amino error
+        authList: [],   // MANDATORY to avoid Amino error
       },
     }];
 
     return requestTxBlock({ 
       chainId: "your-appchain-id", // Strongly recommended for appchains
-      messages 
+      msgs: messages 
     });
   };
 
@@ -320,33 +409,33 @@ export function useBankActions(contractAddress: string) {
 }
 ```
 
-### Wasm Contract Execution (`requestTxBlock` flow)
+### Wasm Contract Execution (`requestTxSync` flow)
 
 ```tsx
 import { useInterwovenKit } from "@initia/interwovenkit-react";
 
 export function useBoardActions(contractAddress: string) {
-  const { initiaAddress, requestTxBlock } = useInterwovenKit();
+  const { initiaAddress, requestTxSync } = useInterwovenKit();
 
-  const postMessage = async (content: string) => {
+  const postMessage = async (message: string) => {
     if (!initiaAddress) return;
 
     // MsgExecuteContract expects 'msg' as bytes (Uint8Array)
-    const msg = new TextEncoder().encode(JSON.stringify({ post_message: { content } }));
+    const msg = new TextEncoder().encode(JSON.stringify({ post_message: { message } }));
 
-    const messages = [{
-      typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
-      value: {
-        sender: initiaAddress,
-        contract: contractAddress,
-        msg,
-        funds: [],
-      },
-    }];
-
-    return requestTxBlock({ 
-      chainId: "your-appchain-id",
-      messages 
+    return requestTxSync({ 
+      chainId: "social-1",
+      messages: [
+        {
+          typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
+          value: {
+            sender: initiaAddress,
+            contract: contractAddress,
+            msg,
+            funds: [],
+          },
+        },
+      ],
     });
   };
 
@@ -354,12 +443,86 @@ export function useBoardActions(contractAddress: string) {
 }
 ```
 
+## Liquidity Management (Bridge)
+
+InterwovenKit provides specialized UI modals for moving funds between chains. Use `openBridge` for a simplified entry point that handles both directions.
+
+**Local Dev Support**: In local environments, the modal may be blank if using local `chainId`. Use a public testnet ID (e.g., `initiation-2`) for demos.
+
+```tsx
+import { useInterwovenKit } from "@initia/interwovenkit-react";
+
+export function BridgeButton() {
+  const { address, openBridge } = useInterwovenKit();
+
+  const handleBridge = () => {
+    if (!address) return;
+    openBridge({
+      srcChainId: "initiation-2", 
+      srcDenom: "uinit"
+    });
+  };
+
+  return (
+    <div className="bridge-ui">
+      <button onClick={handleBridge}>Bridge Assets</button>
+    </div>
+  );
+}
+```
+
 #### Pro Tip: EVM Dual-Address Requirements
 When interacting with an EVM appchain:
-1. **Querying (`eth_call`)**: Use the **hex address** (`0x...`) for the `from` parameter. You can convert a bech32 address using `AccAddress.toHex(address)`.
-2. **Transacting (`MsgCall`)**: Use the **bech32 address** (`init1...`) for the `sender` field in the message payload. The `contractAddr` should still be **hex** (`0x...`).
+1. **Querying (`eth_call` / `ethers`)**: Use the **hex address** (`0x...`) for the `from` or contract view parameters. You MUST convert a bech32 address using `AccAddress.toHex(address)` from `@initia/initia.js`.
+2. **Transacting (`MsgCall`)**: Use the **bech32 address** (`init1...`) for the `sender` field in the message payload. The `contractAddr` MUST be **hex** (`0x...`).
 
-- **Note**: When passing a raw object (not using `MsgCall.fromPartial`), you MUST use **camelCase** for the fields (e.g., `contractAddr`, `accessList`) and ensure **both** the address and input have the `0x` prefix to satisfy simulation requirements.
+- **Address Conversion (Hex)**:
+  ```javascript
+  import { AccAddress } from "@initia/initia.js";
+  import { ethers } from "ethers";
+
+  const toHexAddress = (bech32Addr) => {
+    try {
+      const hex = AccAddress.toHex(bech32Addr);
+      const cleanHex = hex.startsWith("0x") ? hex : `0x${hex}`;
+      return ethers.getAddress(cleanHex); // Normalizes checksum
+    } catch (e) {
+      return null;
+    }
+  };
+  ```
+
+- **MsgCall Requirements**: When passing a raw object (not using `MsgCall.fromPartial`), you MUST use **camelCase** for the fields (e.g., `contractAddr`, `accessList`, `authList`) and ensure **both** the address and input have the `0x` prefix. You MUST also include `accessList: []` and `authList: []` as empty arrays to avoid Amino conversion errors.
+
+- **Note**: If `contractAddr` is passed as hex but still fails with "empty address string", try explicitly casting it: `AccAddress.fromHex(CONTRACT_ADDRESS.replace('0x', ''))`. However, the standard `0x...` hex string is usually preferred for `minievm`.
+
+## Move-Specific: View Function Argument Encoding
+
+When calling Move view functions using `rest.move.view`, address arguments MUST be formatted as 32-byte padded hex strings and then Base64 encoded. Failure to do so will result in `400 Bad Request` errors.
+
+```javascript
+import { AccAddress } from "@initia/initia.js";
+
+const fetchMoveState = async (address) => {
+  // 1. Convert bech32 to Hex
+  // 2. Remove '0x' prefix and pad to 64 chars (32 bytes)
+  // 3. Convert to Buffer and then Base64 string
+  const b64Addr = Buffer.from(
+    AccAddress.toHex(address).replace('0x', '').padStart(64, '0'), 
+    'hex'
+  ).toString('base64');
+
+  const res = await rest.move.view(
+    MODULE_ADDR,
+    MODULE_NAME,
+    'your_view_function',
+    [], // Type arguments
+    [b64Addr] // Encoded arguments
+  );
+  
+  return JSON.parse(res.data);
+};
+```
 
 ## Optional Advanced Path: Direct SDK Contract Calls
 
@@ -367,6 +530,7 @@ When interacting with an EVM appchain:
 import { RESTClient, bcs, AccAddress } from "@initia/initia.js";
 import { MsgExecute } from "@initia/initia.proto/initia/move/v1/tx";
 
+// Use RESTClient for SDK v1.0+
 const rest = new RESTClient("http://localhost:1317", { chainId: "mygame-1" });
 
 // Prefer querying resources directly for state
@@ -396,14 +560,20 @@ export function getHexAddress(address: string) {
 - **EVM: MsgCall Value Type**: The `value` field in `MsgCall` (for sending native tokens) MUST be a string representing the amount in base units (wei).
   - **Fix**: Use `parseEther(amount).toString()` to ensure it's a string.
 
+- **EVM: URL not found error**: This error in the frontend usually occurs when the `customChain` config is missing the `json-rpc` entry in `apis`.
+  - **Fix**: Add `"json-rpc": [{ address: "http://localhost:8545" }]` to your `customChain.apis`.
+
+- **EVM: Ethers v6 Syntax**: Many modern InterwovenKit projects pull in `ethers` v6, which has breaking changes from v5.
+  - **Fix**: Use `new ethers.Interface()` instead of `ethers.utils.Interface`, and `ethers.parseEther()` instead of `ethers.utils.parseEther()`.
+
 - **Wasm: Query 400 Bad Request**: `smartContractState` expects the query to be a Base64-encoded string.
   - **Fix**: `const queryData = Buffer.from(JSON.stringify(query)).toString("base64"); rest.wasm.smartContractState(addr, queryData);`
 
-- **Wasm: Transaction "invalid payload"**: `MsgExecuteContract` expects the `msg` field as bytes (`Uint8Array`).
+- **Wasm: Transaction "invalid payload" / map error**: `MsgExecuteContract` expects the `msg` field as bytes (`Uint8Array`). If `requestTxBlock` fails with a `.map()` error, try using `requestTxSync` with the `messages` (plural) field.
   - **Fix**: Use `new TextEncoder().encode(JSON.stringify(msg))` for the `msg` field.
 
 - **Buffer is not defined**: Initia.js uses Node.js globals. Use `vite-plugin-node-polyfills` or manual global assignment.
-- **Chain not found**: Ensure `customChain` is passed to `InterwovenKitProvider` (singular prop for a single chain) and `defaultChainId` matches.
+- **Chain not found**: Ensure `customChain` is passed to `InterwovenKitProvider` (singular prop for a single chain) and `defaultChainId` matches. Ensure `rpc`, `rest`, AND `indexer` are present in `customChain.apis`.
 - **URL not found**: Ensure `rpc`, `rest`, AND `indexer` are present in `customChain.apis`.
 - **LCDClient or useRest is not an export**: These hooks are not currently exported in `@initia/interwovenkit-react` v2.4.0. Use `RESTClient` from `@initia/initia.js` instead.
 - **View function 400/500 errors**: Ensure arguments are correctly typed strings (e.g., `address:init1...`) and parameters match Move signature exactly. Prefer `resource()` queries for simple state.
