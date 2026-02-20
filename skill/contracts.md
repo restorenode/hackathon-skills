@@ -180,11 +180,12 @@ module MyProject::oracle_consumer {
 ```bash
 # Build (Always specify version 2.1 for latest features)
 # If your Move.toml uses "_" for an address, provide it via --named-addresses
+# CRITICAL: --named-addresses MUST use HEX addresses (0x...), NOT bech32 (init1...)
 # Ensure the named address matches the package name in Move.toml
-minitiad move build --language-version=2.1 --named-addresses MyProject=0x2
+minitiad move build --language-version=2.1 --named-addresses MyProject=0x82ac...
 
 # Test
-minitiad move test --language-version=2.1 --named-addresses MyProject=0x2
+minitiad move test --language-version=2.1 --named-addresses MyProject=0x82ac...
 ```
 
 ### Deploy and Publish (Move)
@@ -202,7 +203,7 @@ Initia requires the module address in `Move.toml` to match the sender's address 
 # 1. Automated Deploy (Recommended)
 # Run this from your Move project root
 # It is recommended to build explicitly first to ensure address resolution
-minitiad move build --language-version=2.1
+minitiad move build --language-version=2.1 --named-addresses MyProject=0x<SENDER_HEX>
 minitiad move deploy \
   --from gas-station \
   --keyring-backend test \
@@ -210,17 +211,19 @@ minitiad move deploy \
   --gas auto --gas-adjustment 1.4 --yes
 
 # 2. Manual Publish (Specific bytecode files)
+# NOTE: publish does NOT support --named-addresses. Build first, then publish the .mv file.
 minitiad tx move publish <PATH_TO_BYTECODE> \
   --from gas-station \
   --keyring-backend test \
   --chain-id <CHAIN_ID> \
-  --gas auto --gas-adjustment 1.4 --yes
+  --gas auto --gas-adjustment 1.4 --yes --upgrade-policy COMPATIBLE
 ```
 
 ### Execute and Query (Move)
 
 ```bash
 # 1. Execute a function (entry point)
+# Must provide exactly 3 args: [module_address] [module_name] [function_name]
 minitiad tx move execute <MODULE_ADDRESS> <MODULE_NAME> <FUNCTION_NAME> \
   --args <JSON_ARGS_ARRAY> \
   --from gas-station \

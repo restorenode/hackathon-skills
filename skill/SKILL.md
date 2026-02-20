@@ -88,9 +88,11 @@ When solving an Initia task:
 - Before scaffolding (e.g., `minitiad move new` or `npm create vite`), check if a project already exists in the current directory (`ls -F`).
 - If the user is already inside a project directory (has a `Move.toml` or `package.json`), do NOT create a new subdirectory unless explicitly asked.
 - **EVM/Foundry**: If installing libraries (e.g., `forge install`), ensure the directory is a git repository (`git init`) and use `--no-git` to avoid submodule issues if git is not desired.
-- **Scaffolding Strategy**: To avoid terminal hangs or interactive prompts, ALWAYS use the provided scaffolding scripts (see step 8 for contracts and step 10 for frontends). These scripts ensure a 100% non-interactive experience.
-- **Component Mounting**: After creating a new feature component (e.g., `Board.jsx`), ALWAYS verify that it is imported and rendered in `App.jsx` (or the appropriate parent component). A feature is not implemented if the user cannot see it in the UI.
-- **Post-Scaffold Config**: After scaffolding a frontend for a local appchain, you MUST update `src/main.jsx` to include the `customChain` configuration in the `InterwovenKitProvider`. See `frontend-interwovenkit.md` for the standard local appchain config object. Ensure the `chain_id` and `rpc`/`rest` endpoints match the discovered appchain runtime. Additionally, you MUST ensure `vite.config.js` is updated with `vite-plugin-node-polyfills` (specifically for `Buffer`) as `initia.js` and other SDKs depend on these globals.
+- **Scaffolding Strategy**: To avoid terminal hangs or interactive prompts, ALWAYS use the provided scaffolding scripts. These scripts ensure a 100% non-interactive experience.
+- **Frontend Entry Point (CRITICAL)**: After scaffolding, you MUST verify the existence of `index.html` in the project root. If missing, create a standard Vite `index.html` with `<div id="root"></div>` and the module script pointing to `src/main.jsx`.
+- **Mandatory Dependencies (CRITICAL)**: When setting up an InterwovenKit frontend, you MUST ensure the following packages are installed as they are required peer dependencies: `@tanstack/react-query`, `wagmi`, `viem`, and `buffer`.
+- **Component Mounting**: After creating a new feature component (e.g., `Board.jsx`), ALWAYS verify that it is imported and rendered in `App.jsx`.
+- **Post-Scaffold Config**: After scaffolding a frontend for a local appchain, you MUST update `src/main.jsx` to include the `customChain` configuration in the `InterwovenKitProvider`. See `frontend-interwovenkit.md` for the standard local appchain config object. Ensure the `chain_id` and `rpc`/`rest` endpoints match the discovered appchain runtime. Additionally, you MUST ensure `vite.config.js` is updated with `vite-plugin-node-polyfills` (specifically for `Buffer`) as `initia.js` and other SDKs depend on these globals. Furthermore, ensure `src/App.css` exists as it is typically imported by `App.jsx`.
 - **Frontend Provider & Polyfill Setup (CRITICAL)**: In `main.jsx`, you MUST:
   1. Define global polyfills for `Buffer` and `process` at the TOP of the file:
      ```javascript
@@ -124,7 +126,7 @@ When solving an Initia task:
   4. Import and use `useAccount` and `useDisconnect` from `wagmi` for wallet state, while using `useInterwovenKit` for `initiaAddress`, `requestTxBlock`, and `openConnect`.
   5. **IMPORTANT (v2.4.0)**: Use `openConnect` (not `openModal`) to open the wallet connection modal. Extract it from the `useInterwovenKit` hook.
   6. **IMPORTANT (v2.4.0)**: `useInterwovenKit` does NOT export a `rest` client. You MUST instantiate `RESTClient` from `@initia/initia.js` manually for queries.
-  7. **Chain Stability (CRITICAL)**: To avoid "Chain not found" or "URL not found" errors, the `customChain.apis` object MUST include `rpc`, `rest`, AND `indexer` (even as a placeholder like `[{ address: "http://localhost:8080" }]`) in `apis`. Additionally, `metadata` MUST include `is_l1: false` for appchains. Always use the singular `customChain` prop in `InterwovenKitProvider` for a single local appchain.
+  7. **Chain Stability (CRITICAL)**: To avoid "Chain not found" or "URL not found" errors, the `customChain.apis` object MUST include `rpc`, `rest`, AND `indexer` (even as a placeholder like `[{ address: "http://localhost:8080" }]`) in `apis`. Additionally, `metadata` MUST include `is_l1: false` for appchains. The `customChain` MUST also include a `fees` section with `fee_tokens` (e.g., `fees: { fee_tokens: [{ denom: "umin", fixed_min_gas_price: 0.15, ... }] }`) to prevent runtime SDK errors. Always use the singular `customChain` prop in `InterwovenKitProvider` for a single local appchain.
   8. **EVM Compatibility (NEW)**: For EVM-compatible appchains, the `customChain.apis` object MUST include a `"json-rpc"` entry (e.g., `[{ address: "http://localhost:8545" }]`). Failure to include any of these endpoints in the correct array-of-objects format will result in "URL not found" errors during frontend runtime.
 - **Transaction Message Flow (CRITICAL)**: When performing transactions via `useInterwovenKit`:
   1. For Wasm contract execution, ALWAYS include the `chainId` in the payload to avoid "must contain at least one message" RPC errors.
@@ -135,9 +137,10 @@ When solving an Initia task:
   6. **EVM Queries**: When querying EVM state using `ethers` or `eth_call`, you MUST convert bech32 addresses to hex using `AccAddress.toHex(address)` from `@initia/initia.js`. Ensure the resulting string has exactly one `0x` prefix (e.g. `const cleanHex = hex.startsWith('0x') ? hex : '0x' + hex`).
   7. **Ethers v6 Syntax**: Modern InterwovenKit versions use `ethers` v6. Ensure you use `new ethers.Interface()` and `ethers.parseEther()` instead of the deprecated `ethers.utils` patterns.
   8. **Move MsgExecute (Transactions)**: In Move `MsgExecute` messages via `initia.js`, you MUST use **camelCase** for fields (`moduleAddress`, `moduleName`, `functionName`, `typeArgs`). The `moduleAddress` MUST be in **bech32** format (e.g., `init1...`). Using hex will result in "empty address string is not allowed" errors.
-  9. **Auto-Sign API**: The `useInterwovenKit` hook returns an `autoSign` object (not individual functions). Use `autoSign.isEnabledByChain[chainId]` for status, and `autoSign.enable(chainId)` / `autoSign.disable(chainId)` for actions. 
+  9. **Move CLI Execution (minitiad)**: When using `minitiad tx move execute`, you MUST provide exactly 3 positional arguments: `[module_address] [module_name] [function_name]`. Use the `--args` and `--type-args` flags for parameters. Arguments in `--args` MUST be prefixed with their Move type (e.g., `'["address:init1...", "u64:100"]'`).
+  10. **Auto-Sign API**: The `useInterwovenKit` hook returns an `autoSign` object (not individual functions). Use `autoSign.isEnabledByChain[chainId]` for status, and `autoSign.enable(chainId)` / `autoSign.disable(chainId)` for actions. 
      - **Setup Requirement**: Auto-signing ONLY works if `enableAutoSign={true}` is passed to the `InterwovenKitProvider` in `main.jsx`.
-  10. Example: `await requestTxSync({ chainId: 'social-1', messages: [...] })`
+  11. Example: `await requestTxSync({ chainId: 'social-1', messages: [...] })`
 - **NPM Warnings**: During scaffolding or dependency installation, you may encounter `ERRESOLVE` or peer dependency warnings. These are common in the current ecosystem and should be treated as non-fatal unless the build actually fails.
 - When generating files, confirm the absolute path with the user if there is ambiguity.
 
@@ -171,6 +174,8 @@ When solving an Initia task:
   - **Whole Tokens vs. Base Units**: If a user asks for "X tokens" and the denom is a micro-unit (e.g., `umin`), assume they mean whole tokens and multiply by $10^6$ (Move/Wasm) or $10^{18}$ (EVM) unless they explicitly specify "base units" or "u-amount".
   - **Multipliers**: For EVM-compatible rollups, the precision is usually 18 decimals. When a user asks for "1 token", send `1000000000000000000` of the base unit.
   - **Avoid Script Defaults**: Do not rely on `fund-user.sh` to handle precision or denoms automatically. Explicitly calculate the base unit amount and specify the correct denom in your commands.
+
+- **Pro Tip: Move Publishing (CRITICAL)**: When publishing Move modules, the `minitiad tx move publish` command does NOT support the `--named-addresses` flag. You MUST first build the module using `minitiad move build --named-addresses name=0x...` and then publish the generated `.mv` file. The `--upgrade-policy` flag value MUST be uppercase (e.g., `COMPATIBLE`).
 
 - **Pro Tip: Wasm REST Queries (CRITICAL)**: When querying Wasm contract state using the `RESTClient` (e.g., `rest.wasm.smartContractState`), the query object MUST be manually Base64-encoded. The client does NOT handle this automatically. 
   - **Example**: `const query = Buffer.from(JSON.stringify({ msg: {} })).toString("base64"); await rest.wasm.smartContractState(addr, query);`

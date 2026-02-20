@@ -101,6 +101,14 @@ Avoid hard-coded version matrices in this skill.
 5. For custom appchains, provide a complete `customChain` object including `rpc`, `rest`, and a placeholder `indexer`.
 6. Use `RESTClient` (from `@initia/initia.js`) for querying resources or view functions. **Note: `LCDClient` is deprecated.**
 7. Prefer `rest.move.resource` for state queries as it is more robust than view functions.
+8. **IMPORTANT (v2.4.0)**: Use `openConnect` (not `openModal`) to open the wallet connection modal. Extract it from the `useInterwovenKit` hook.
+9. **IMPORTANT (v2.4.0)**: `useInterwovenKit` does NOT export a `rest` client. You MUST instantiate `RESTClient` from `@initia/initia.js` manually for queries.
+10. **Auto-Sign API**: The `useInterwovenKit` hook returns an `autoSign` object (not individual functions). 
+    - Status: `autoSign.isEnabledByChain[chainId]`
+    - Enable: `await autoSign.enable(chainId)`
+    - Disable: `await autoSign.disable(chainId)`
+    - **Setup Requirement**: `enableAutoSign={true}` must be passed to the `InterwovenKitProvider` in `main.jsx`.
+11. **Chain Stability (CRITICAL)**: To avoid "Chain not found" or "URL not found" errors, the `customChain.apis` object MUST include `rpc`, `rest`, AND `indexer` (even if indexer is a placeholder).
 
 ## Provider Setup (Current Baseline)
 
